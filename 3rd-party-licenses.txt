@@ -1,0 +1,6 @@
+Third Party Licenses
+====================
+
+MIT Licenses
+Copyright (c) 2018 Adafruit Industries
+Copyright (c) 2015 BlueRobotics
