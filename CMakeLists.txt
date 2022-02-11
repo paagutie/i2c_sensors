@@ -32,7 +32,7 @@ include_directories(include
   ${rclcpp_INCLUDE_DIRS}
   #${EIGEN3_INCLUDE_DIR} 
 )
-ament_python_install_package(scripts/)
+ament_python_install_package(scripts)
 
 file(GLOB SOURCE_FILES
  src/BNO055.cpp
