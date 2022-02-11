@@ -5,7 +5,7 @@ This repository contains a plugin for the use of I2C sensors such as the BNO055 
 For use in our systems (ARM Processors), arduino libraries such as the [Adafruit_BNO055](https://github.com/adafruit/Adafruit_BNO055) and [BlueRobotics_MS5837_Library](https://github.com/bluerobotics/BlueRobotics_MS5837_Library) were adapted and new functions were added.
 
 ## Requirements
-- [ROS2](https://docs.ros.org/en/foxy/Installation.html) - Foxy
+- [ROS2](https://docs.ros.org/en/galactic/Installation.html) - Galactic
 - Ubuntu 20.04
 - [uuv_msgs](https://github.com/MARUM-MUtTI/uuv_msgs)
 - Tested on the NVIDIA Jetson Nano board.
@@ -13,7 +13,7 @@ For use in our systems (ARM Processors), arduino libraries such as the [Adafruit
 ## Installation
 - Clone the repositories and compile them:
 ```
-$ source /opt/ros/foxy/setup.bash
+$ source /opt/ros/galactic/setup.bash
 $ mkdir -p ~/ros2_ws/src
 $ cd ~/ros2_ws/src
 $ git clone https://github.com/MARUM-MUtTI/uuv_msgs.git
@@ -46,7 +46,7 @@ $ ros2 launch i2c_sensors composition.launch.py
 ```
 - Then in a new terminal the initial options can be viewed using Lifecycle. To know the available transitions:
 ```
-$ source /opt/ros/foxy/setup.bash
+$ source /opt/ros/galactic/setup.bash
 $ ros2 lifecycle list /i2c_sensors_node
 
 - configure [1]
