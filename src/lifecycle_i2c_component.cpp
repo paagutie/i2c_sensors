@@ -21,7 +21,6 @@ LifecycleI2CSensors::LifecycleI2CSensors(const rclcpp::NodeOptions & options)
 : rclcpp_lifecycle::LifecycleNode("i2c_sensors_node", options)
 {
     //ROS2 Parameters
-    this->declare_parameter<bool>("read_sensor_quality", false);
     this->declare_parameter<bool>("write_calibration",   false);
 }
 
@@ -147,7 +146,8 @@ LifecycleI2CSensors::on_configure(const rclcpp_lifecycle::State &)
     bno.setSensorOffsets(calib_data);
     std::this_thread::sleep_for(2s);
     
-    while(readSensorQuality || writeCalibration)
+    writeCalibration = this->get_parameter("write_calibration").as_bool();
+    while(writeCalibration)
     {
         this->set_new_calibration_parameters();
         std::this_thread::sleep_for(0.5s);
@@ -197,15 +197,11 @@ LifecycleI2CSensors::on_deactivate(const rclcpp_lifecycle::State &)
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
 LifecycleI2CSensors::on_cleanup(const rclcpp_lifecycle::State &)
 {
-
-    readSensorQuality = false;
     writeCalibration = false;
     barometer_ready_ = false;
     
     //Reset parameters
-    this->set_parameters({
-                           rclcpp::Parameter("read_sensor_quality", false),
-                           rclcpp::Parameter("write_calibration",   false), });
+    this->set_parameters({rclcpp::Parameter("write_calibration",   false), });
     
     count_baro = 0;
     loops = 0;
@@ -403,7 +399,6 @@ void LifecycleI2CSensors::set_new_calibration_parameters()
 
         this->set_parameters(
         {
-            rclcpp::Parameter("read_sensor_quality", false),
             rclcpp::Parameter("write_calibration", false),
         });
     }
@@ -456,9 +451,7 @@ const std::vector<rclcpp::Parameter> &parameters)
         if(param_type == rclcpp::ParameterType::PARAMETER_BOOL)
         {
             bool value = parameter.as_bool();
-            if(name == "read_sensor_quality")
-                this->set_parameter(value, readSensorQuality, result);
-            else if(name == "write_calibration")
+            if(name == "write_calibration")
                 this->set_parameter(value, writeCalibration, result);
         }
 

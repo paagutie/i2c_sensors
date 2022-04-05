@@ -163,7 +163,6 @@ private:
   int count_baro = 0;
     
   int loops = 0;
-  bool readSensorQuality = false;
   bool writeCalibration = false;
 
   bool barometer_ready_ = false;
