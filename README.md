@@ -77,19 +77,22 @@ $ ros2 lifecycle set /i2c_sensors_node shutdown
 ```
 
 #### IMU Sensor calibration
-- To just read the quality of the IMU sensor data readout, open a new terminal:
+- To just read the quality of the IMU sensor data readout (It works only using the c++ node), open a new terminal:
 
-**Note:** To perform sensor calibration using the **Lifecycle management method** after the sensor has been configured, it's necessary to **deactivate** and clear (**cleanup**) the sensor data, set the parameters (**read_sensor_quality** and/or **write_calibration**) and reconfigure (**configure**).
 ```
 $ cd ~/ros2_ws
 $ source install/setup.bash
 $ ros2 param set /i2c_sensors_node read_sensor_quality true
 ```
 
-- To write the new calibration data, in the same terminal use:
+- To write a new calibration data, use:
+
 ```
 $ ros2 param set /i2c_sensors_node write_calibration true
 ```
+
+**Note:** To perform sensor calibration using the **Lifecycle management method** after the sensor has been configured, it's necessary to **deactivate** and clear (**cleanup**) the sensor data, set the parameter (**write_calibration**) and reconfigure (**configure**).
+
 
 ## ROS2 Topics 
 - `barometer/data`
