@@ -31,7 +31,7 @@ There are two ways to use this package. The first one uses a node written in c++
 ```
 $ cd ~/ros2_ws
 $ source install/setup.bash
-$ ros2 run i2c_sensors i2c_sensors_node
+$ ros2 run i2c_sensors i2c_sensors_node --ros-args -p i2c_bus_address:='/dev/i2c-1' -p use_ms5837:='false'
 ```
 #### Lifecycle management 
 ROS 2 introduces the concept of managed nodes, also called LifecycleNodes. Managed nodes contain a state machine with a set of predefined states. These states can be changed by invoking a transition id which indicates the succeeding consecutive state.
@@ -42,7 +42,7 @@ ROS 2 introduces the concept of managed nodes, also called LifecycleNodes. Manag
 ```
 $ cd ~/ros2_ws
 $ source install/setup.bash
-$ ros2 launch i2c_sensors composition.launch.py
+$ ros2 launch i2c_sensors composition.launch.py i2c_bus_address:='/dev/i2c-1' use_bno55:=true use_ms5837:=false
 ```
 - Then in a new terminal the initial options can be viewed using Lifecycle. To know the available transitions:
 ```
@@ -99,3 +99,9 @@ $ ros2 param set /i2c_sensors_node write_calibration true
 - `imu/data`
 - `euler/data`
 
+## ROS2 Parameters 
+- `i2c_bus_address`
+- `use_bno055`
+- `use_ms5837`
+- `read_sensor_quality`
+- `write_calibration`
