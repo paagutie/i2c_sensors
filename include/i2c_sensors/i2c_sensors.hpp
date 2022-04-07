@@ -90,6 +90,9 @@ private:
     uint8_t *calib_data;
     char *filename;
     int count_baro = 0;
+    std::string i2c_address;
+    bool useBNO055;
+    bool useMS5837;
     
     int loops = 0;
     bool readSensorQuality = false;

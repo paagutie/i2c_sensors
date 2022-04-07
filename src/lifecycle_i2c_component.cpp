@@ -21,7 +21,17 @@ LifecycleI2CSensors::LifecycleI2CSensors(const rclcpp::NodeOptions & options)
 : rclcpp_lifecycle::LifecycleNode("i2c_sensors_node", options)
 {
     //ROS2 Parameters
-    this->declare_parameter<bool>("write_calibration",   false);
+    this->declare_parameter<std::string>("i2c_bus_address", "/dev/i2c-1");
+    i2c_address = this->get_parameter("i2c_bus_address").as_string();
+    RCLCPP_INFO(get_logger(), "I2C_BUS_ADDRESS: '%s'", i2c_address.c_str());
+
+    this->declare_parameter<bool>("use_bno055", true);
+    this->declare_parameter<bool>("use_ms5837", true);
+
+    useBNO055 = this->get_parameter("use_bno055").as_bool();
+    useMS5837 = this->get_parameter("use_ms5837").as_bool();
+
+    this->declare_parameter<bool>("write_calibration", false);   
 }
 
 LifecycleI2CSensors::~LifecycleI2CSensors() {
@@ -43,120 +53,128 @@ LifecycleI2CSensors::on_configure(const rclcpp_lifecycle::State &)
     calib_data = new uint8_t[22]; 
     filename = new char[15];
     
-    sprintf(filename,"/dev/i2c-1");
+    sprintf(filename,(char*)i2c_address.c_str());
     file = open(filename, O_RDWR);
  
     bno = Adafruit_BNO055();
     ms5837 = MS5837();
 
-    
-    //int addr = 0x76; The I2C address
-    if (ioctl(file, I2C_SLAVE, MS5837_ADDR) < 0) 
+    if(useMS5837)
     {
-        RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to MS5837.");
-    	//ERROR HANDLING; you can check errno to see what went wrong 
-        return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::FAILURE;
+        RCLCPP_INFO(get_logger(), "The pressure sensor has been selected.");
+        //int addr = 0x76; The I2C address
+        if (ioctl(file, I2C_SLAVE, MS5837_ADDR) < 0) 
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to MS5837.");
+            //ERROR HANDLING; you can check errno to see what went wrong 
+            return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::FAILURE;
+        }
+
+        ms5837.setPort(file);
+        
+        while (!ms5837.init()) {
+            RCLCPP_INFO(this->get_logger(), "Are SDA/SCL connected correctly?");
+            RCLCPP_INFO(this->get_logger(), "Blue Robotics Bar30: White=SDA, Green=SCL");
+            std::this_thread::sleep_for(2s);
+        }
+
+        barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", 1);
     }
 
-    ms5837.setPort(file);
-    
-    while (!ms5837.init()) {
-        RCLCPP_INFO(this->get_logger(), "Are SDA/SCL connected correctly?");
-        RCLCPP_INFO(this->get_logger(), "Blue Robotics Bar30: White=SDA, Green=SCL");
-        std::this_thread::sleep_for(2s);
-    }
-    
-    //int addr = 0x28; /* The I2C address */
-    if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
-    	return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::FAILURE;
-    }
-    
-    bno.setI2CPort(file);
-
-    while(!bno.begin(bno.OPERATION_MODE_NDOF)){
-        RCLCPP_INFO(this->get_logger(), "Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
-        std::this_thread::sleep_for(2s);
-    }
-    
-    bno.setExtCrystalUse(true);
-
-
-    
-    //IMU BNO055 Calibration data
-    /*
-        --- Accelerometer Offset registers ---
-    ACCEL_OFFSET_X_LSB_ADDR                                 = 0X55,
-    ACCEL_OFFSET_X_MSB_ADDR                                 = 0X56,
-    ACCEL_OFFSET_Y_LSB_ADDR                                 = 0X57,
-    ACCEL_OFFSET_Y_MSB_ADDR                                 = 0X58,
-    ACCEL_OFFSET_Z_LSB_ADDR                                 = 0X59,
-    ACCEL_OFFSET_Z_MSB_ADDR                                 = 0X5A,
-
-    --- Magnetometer Offset registers --- 
-    MAG_OFFSET_X_LSB_ADDR                                   = 0X5B,
-    MAG_OFFSET_X_MSB_ADDR                                   = 0X5C,
-    MAG_OFFSET_Y_LSB_ADDR                                   = 0X5D,
-    MAG_OFFSET_Y_MSB_ADDR                                   = 0X5E,
-    MAG_OFFSET_Z_LSB_ADDR                                   = 0X5F,
-    MAG_OFFSET_Z_MSB_ADDR                                   = 0X60,
-
-    --- Gyroscope Offset registers ---
-    GYRO_OFFSET_X_LSB_ADDR                                  = 0X61,
-    GYRO_OFFSET_X_MSB_ADDR                                  = 0X62,
-    GYRO_OFFSET_Y_LSB_ADDR                                  = 0X63,
-    GYRO_OFFSET_Y_MSB_ADDR                                  = 0X64,
-    GYRO_OFFSET_Z_LSB_ADDR                                  = 0X65,
-    GYRO_OFFSET_Z_MSB_ADDR                                  = 0X66,
-
-    --- Radius registers --- 
-    ACCEL_RADIUS_LSB_ADDR                                   = 0X67,
-    ACCEL_RADIUS_MSB_ADDR                                   = 0X68,
-    MAG_RADIUS_LSB_ADDR                                     = 0X69,
-    MAG_RADIUS_MSB_ADDR                                     = 0X6A
-    */
-    
-    //--- Accelerometer Offset registers ---
-    calib_data[0] = 11;   
-    calib_data[1] = 0;    
-    calib_data[2] = 51;   
-    calib_data[3] = 0;    
-    calib_data[4] = 244;  
-    calib_data[5] = 255;
-    calib_data[6] = 213; 
-    //--- Magnetometer Offset registers --- 
-    calib_data[7] = 253;   
-    calib_data[8] = 11;    
-    calib_data[9] = 255;
-    calib_data[10] = 171;  
-    calib_data[11] = 255;  
-    calib_data[12] = 255;  
-    //--- Gyroscope Offset registers ---
-    calib_data[13] = 255;  
-    calib_data[14] = 254;  
-    calib_data[15] = 255;
-    calib_data[16] = 1;   
-    calib_data[17] = 0;
-    //--- Radius registers --- 
-    calib_data[18] = 232;
-    calib_data[19] = 3;
-    calib_data[20] = 26;   
-    calib_data[21] = 4;    
-
-    bno.setSensorOffsets(calib_data);
-    std::this_thread::sleep_for(2s);
-    
-    writeCalibration = this->get_parameter("write_calibration").as_bool();
-    while(writeCalibration)
+    if(useBNO055)
     {
-        this->set_new_calibration_parameters();
-        std::this_thread::sleep_for(0.5s);
+        RCLCPP_INFO(get_logger(), "The IMU sensor has been selected.");
+        //int addr = 0x28; /* The I2C address */
+        if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
+            return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::FAILURE;
+        }
+        
+        bno.setI2CPort(file);
+
+        while(!bno.begin(bno.OPERATION_MODE_NDOF)){
+            RCLCPP_INFO(this->get_logger(), "Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+            std::this_thread::sleep_for(2s);
+        }
+        
+        bno.setExtCrystalUse(true);
+
+
+        
+        //IMU BNO055 Calibration data
+        /*
+            --- Accelerometer Offset registers ---
+        ACCEL_OFFSET_X_LSB_ADDR                                 = 0X55,
+        ACCEL_OFFSET_X_MSB_ADDR                                 = 0X56,
+        ACCEL_OFFSET_Y_LSB_ADDR                                 = 0X57,
+        ACCEL_OFFSET_Y_MSB_ADDR                                 = 0X58,
+        ACCEL_OFFSET_Z_LSB_ADDR                                 = 0X59,
+        ACCEL_OFFSET_Z_MSB_ADDR                                 = 0X5A,
+
+        --- Magnetometer Offset registers --- 
+        MAG_OFFSET_X_LSB_ADDR                                   = 0X5B,
+        MAG_OFFSET_X_MSB_ADDR                                   = 0X5C,
+        MAG_OFFSET_Y_LSB_ADDR                                   = 0X5D,
+        MAG_OFFSET_Y_MSB_ADDR                                   = 0X5E,
+        MAG_OFFSET_Z_LSB_ADDR                                   = 0X5F,
+        MAG_OFFSET_Z_MSB_ADDR                                   = 0X60,
+
+        --- Gyroscope Offset registers ---
+        GYRO_OFFSET_X_LSB_ADDR                                  = 0X61,
+        GYRO_OFFSET_X_MSB_ADDR                                  = 0X62,
+        GYRO_OFFSET_Y_LSB_ADDR                                  = 0X63,
+        GYRO_OFFSET_Y_MSB_ADDR                                  = 0X64,
+        GYRO_OFFSET_Z_LSB_ADDR                                  = 0X65,
+        GYRO_OFFSET_Z_MSB_ADDR                                  = 0X66,
+
+        --- Radius registers --- 
+        ACCEL_RADIUS_LSB_ADDR                                   = 0X67,
+        ACCEL_RADIUS_MSB_ADDR                                   = 0X68,
+        MAG_RADIUS_LSB_ADDR                                     = 0X69,
+        MAG_RADIUS_MSB_ADDR                                     = 0X6A
+        */
+        
+        //--- Accelerometer Offset registers ---
+        calib_data[0] = 11;   
+        calib_data[1] = 0;    
+        calib_data[2] = 51;   
+        calib_data[3] = 0;    
+        calib_data[4] = 244;  
+        calib_data[5] = 255;
+        calib_data[6] = 213; 
+        //--- Magnetometer Offset registers --- 
+        calib_data[7] = 253;   
+        calib_data[8] = 11;    
+        calib_data[9] = 255;
+        calib_data[10] = 171;  
+        calib_data[11] = 255;  
+        calib_data[12] = 255;  
+        //--- Gyroscope Offset registers ---
+        calib_data[13] = 255;  
+        calib_data[14] = 254;  
+        calib_data[15] = 255;
+        calib_data[16] = 1;   
+        calib_data[17] = 0;
+        //--- Radius registers --- 
+        calib_data[18] = 232;
+        calib_data[19] = 3;
+        calib_data[20] = 26;   
+        calib_data[21] = 4;    
+
+        bno.setSensorOffsets(calib_data);
+        std::this_thread::sleep_for(2s);
+        
+        writeCalibration = this->get_parameter("write_calibration").as_bool();
+        while(writeCalibration)
+        {
+            this->set_new_calibration_parameters();
+            std::this_thread::sleep_for(0.5s);
+        }
+
+        imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", 1);
+        euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", 1); 
     }
 
-    //ROS2
-    barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", 1);
-    imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", 1);
-    euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", 1); 
     timer_ = this->create_wall_timer(std::chrono::milliseconds(10),std::bind(&LifecycleI2CSensors::on_timer, this)); //2hz
 
                        
@@ -168,9 +186,13 @@ LifecycleI2CSensors::on_configure(const rclcpp_lifecycle::State &)
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn 
 LifecycleI2CSensors::on_activate(const rclcpp_lifecycle::State &)
 {
-    barometer_pub_->on_activate();
-    imu_pub_->on_activate();
-    euler_pub_->on_activate();
+    if(useMS5837)
+        barometer_pub_->on_activate();
+    if(useBNO055)
+    {
+        imu_pub_->on_activate();
+        euler_pub_->on_activate();
+    }
     
     last_time = std::chrono::high_resolution_clock::now();
     last_time_parameters = std::chrono::steady_clock::now();
@@ -183,10 +205,12 @@ LifecycleI2CSensors::on_activate(const rclcpp_lifecycle::State &)
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn 
 LifecycleI2CSensors::on_deactivate(const rclcpp_lifecycle::State &)
 {
-   
-    barometer_pub_->on_deactivate();
-    imu_pub_->on_deactivate();
-    euler_pub_->on_deactivate();
+    if(useMS5837)
+        barometer_pub_->on_deactivate();
+    if(useBNO055){
+        imu_pub_->on_deactivate();
+        euler_pub_->on_deactivate();
+    }
     
     RCUTILS_LOG_INFO_NAMED(get_name(), "on_deactivate() is called.");
     return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
@@ -211,9 +235,13 @@ LifecycleI2CSensors::on_cleanup(const rclcpp_lifecycle::State &)
     
     this->close_i2c();
     timer_.reset();
-    barometer_pub_.reset();
-    imu_pub_.reset();
-    euler_pub_.reset();
+
+    if(useMS5837)
+        barometer_pub_.reset();
+    if(useBNO055){
+        imu_pub_.reset();
+        euler_pub_.reset();
+    }
 
     RCUTILS_LOG_INFO_NAMED(get_name(), "on cleanup is called.");
     return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;  
@@ -224,9 +252,12 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
 LifecycleI2CSensors::on_shutdown(const rclcpp_lifecycle::State & state)
 {
     timer_.reset();
-    barometer_pub_.reset();
-    imu_pub_.reset();
-    euler_pub_.reset();
+    if(useMS5837)
+        barometer_pub_.reset();
+    if(useBNO055){
+        imu_pub_.reset();
+        euler_pub_.reset();
+    }
 
     RCUTILS_LOG_INFO_NAMED(
       get_name(),
@@ -408,24 +439,18 @@ void LifecycleI2CSensors::set_new_calibration_parameters()
 
 void LifecycleI2CSensors::on_timer()
 {
-
-    if(!barometer_pub_->is_activated() || !imu_pub_->is_activated() || !euler_pub_->is_activated())
+    try
     {
-        //RCLCPP_INFO(get_logger(), "Lifecycle publisher is currently inactive. Messages are not published.");
-    }
-    else
-    { 
-        try
-        {
+        if(barometer_pub_->is_activated())
             this->read_barometer();
+        if(imu_pub_->is_activated() && euler_pub_->is_activated())
             this->read_BNO055();
-        }
-        catch(std::exception& e)
-        {
-            std::cout << "Exception:" << std::endl;
-            std::cout << e.what() << std::endl;
-        }  
     }
+    catch(std::exception& e)
+    {
+        std::cout << "Exception:" << std::endl;
+        std::cout << e.what() << std::endl;
+    }  
 }
 
 

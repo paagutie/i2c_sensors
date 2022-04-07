@@ -20,6 +20,10 @@ from launch_ros.descriptions import ComposableNode
 
 
 def generate_launch_description():
+    launch.actions.DeclareLaunchArgument('i2c_bus_address', default_value='/dev/i2c-1'),
+    launch.actions.DeclareLaunchArgument('use_bno55', default_value='True'),
+    launch.actions.DeclareLaunchArgument('use_ms5837', default_value='True'),
+
     """Generate launch description with multiple components."""
     container = ComposableNodeContainer(
             name='my_container',
@@ -31,6 +35,10 @@ def generate_launch_description():
                     package='i2c_sensors',
                     plugin='composition::LifecycleI2CSensors',
                     name='i2c_sensors_node',
+                    parameters=[
+                        {'i2c_bus_address': launch.substitutions.LaunchConfiguration('i2c_bus_address')},
+                        {'use_bno55': launch.substitutions.LaunchConfiguration('use_bno55')},
+                        {'use_ms5837': launch.substitutions.LaunchConfiguration('use_ms5837')}],
                     extra_arguments=[{'use_intra_process_comms': True}])#,
                 #ComposableNode(
                 #    package='composition',

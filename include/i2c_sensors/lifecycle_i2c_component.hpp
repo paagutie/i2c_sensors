@@ -170,6 +170,10 @@ private:
   double current_depth = 0.0;
   double depth = 0.0;
 
+  std::string i2c_address;
+  bool useBNO055;
+  bool useMS5837;
+
 
   uint8_t *buffer;
   util_tools::imu_t imu_data;

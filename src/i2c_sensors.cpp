@@ -15,124 +15,142 @@ int file;
 I2C_SENSORS::I2C_SENSORS():
 Node("i2c_sensors_node")   
 {
+    //ROS2 Parameters
+    this->declare_parameter<std::string>("i2c_bus_address", "/dev/i2c-1");
+    i2c_address = this->get_parameter("i2c_bus_address").as_string();
+    RCLCPP_INFO(get_logger(), "I2C_BUS_ADDRESS: '%s'", i2c_address.c_str());
+
+    this->declare_parameter<bool>("use_bno055", true);
+    this->declare_parameter<bool>("use_ms5837", true);
+
+    useBNO055 = this->get_parameter("use_bno055").as_bool();
+    useMS5837 = this->get_parameter("use_ms5837").as_bool();
+
+    this->declare_parameter<bool>("read_sensor_quality", false);
+    this->declare_parameter<bool>("write_calibration", false);   
+
     
     calib_data = new uint8_t[22]; 
     filename = new char[15];
     
-    sprintf(filename,"/dev/i2c-1");
+    sprintf(filename,(char*)i2c_address.c_str());
     file = open(filename, O_RDWR);
  
     bno = Adafruit_BNO055();
     ms5837 = MS5837();
 
-    
-    //int addr = 0x76; The I2C address
-    if (ioctl(file, I2C_SLAVE, MS5837_ADDR) < 0) 
+    if(useMS5837)
     {
-        RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to MS5837.");
-    	//ERROR HANDLING; you can check errno to see what went wrong 
-        exit(1);
+        RCLCPP_INFO(get_logger(), "The pressure sensor has been selected.");
+        //int addr = 0x76; The I2C address
+        if (ioctl(file, I2C_SLAVE, MS5837_ADDR) < 0) 
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to MS5837.");
+            //ERROR HANDLING; you can check errno to see what went wrong 
+            exit(1);
+        }
+
+        ms5837.setPort(file);
+        
+        while (!ms5837.init()) {
+            RCLCPP_INFO(this->get_logger(), "Are SDA/SCL connected correctly?");
+            RCLCPP_INFO(this->get_logger(), "Blue Robotics Bar30: White=SDA, Green=SCL");
+            usleep(2000000); // hold on
+        }
+
+        barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", 1);
     }
 
-    ms5837.setPort(file);
-    
-    while (!ms5837.init()) {
-        RCLCPP_INFO(this->get_logger(), "Are SDA/SCL connected correctly?");
-        RCLCPP_INFO(this->get_logger(), "Blue Robotics Bar30: White=SDA, Green=SCL");
+    if(useBNO055)
+    {
+        RCLCPP_INFO(get_logger(), "The IMU sensor has been selected.");
+        //int addr = 0x28; /* The I2C address */
+        if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
+            exit(1);
+        }
+        
+        bno.setI2CPort(file);
+
+        while(!bno.begin(bno.OPERATION_MODE_NDOF)){
+            RCLCPP_INFO(this->get_logger(), "Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+            usleep(2000000); // hold on
+        }
+        
+        bno.setExtCrystalUse(true);
+
+
+        
+        //IMU BNO055 Calibration data
+        /*
+            --- Accelerometer Offset registers ---
+        ACCEL_OFFSET_X_LSB_ADDR                                 = 0X55,
+        ACCEL_OFFSET_X_MSB_ADDR                                 = 0X56,
+        ACCEL_OFFSET_Y_LSB_ADDR                                 = 0X57,
+        ACCEL_OFFSET_Y_MSB_ADDR                                 = 0X58,
+        ACCEL_OFFSET_Z_LSB_ADDR                                 = 0X59,
+        ACCEL_OFFSET_Z_MSB_ADDR                                 = 0X5A,
+
+        --- Magnetometer Offset registers --- 
+        MAG_OFFSET_X_LSB_ADDR                                   = 0X5B,
+        MAG_OFFSET_X_MSB_ADDR                                   = 0X5C,
+        MAG_OFFSET_Y_LSB_ADDR                                   = 0X5D,
+        MAG_OFFSET_Y_MSB_ADDR                                   = 0X5E,
+        MAG_OFFSET_Z_LSB_ADDR                                   = 0X5F,
+        MAG_OFFSET_Z_MSB_ADDR                                   = 0X60,
+
+        --- Gyroscope Offset registers ---
+        GYRO_OFFSET_X_LSB_ADDR                                  = 0X61,
+        GYRO_OFFSET_X_MSB_ADDR                                  = 0X62,
+        GYRO_OFFSET_Y_LSB_ADDR                                  = 0X63,
+        GYRO_OFFSET_Y_MSB_ADDR                                  = 0X64,
+        GYRO_OFFSET_Z_LSB_ADDR                                  = 0X65,
+        GYRO_OFFSET_Z_MSB_ADDR                                  = 0X66,
+
+        --- Radius registers --- 
+        ACCEL_RADIUS_LSB_ADDR                                   = 0X67,
+        ACCEL_RADIUS_MSB_ADDR                                   = 0X68,
+        MAG_RADIUS_LSB_ADDR                                     = 0X69,
+        MAG_RADIUS_MSB_ADDR                                     = 0X6A
+        */
+
+        //--- Accelerometer Offset registers ---
+        calib_data[0] = 11;  //226
+        calib_data[1] = 0;   //255
+        calib_data[2] = 51;   //222
+        calib_data[3] = 0;    //255
+        calib_data[4] = 244;  //255
+        calib_data[5] = 255;
+        calib_data[6] = 213;  //240
+        //--- Magnetometer Offset registers --- 
+        calib_data[7] = 253;  //255
+        calib_data[8] = 11;   //93
+        calib_data[9] = 255;
+        calib_data[10] = 171;  //174
+        calib_data[11] = 255;  //254
+        calib_data[12] = 255;    //0
+        //--- Gyroscope Offset registers ---
+        calib_data[13] = 255;    //0
+        calib_data[14] = 254;    //254
+        calib_data[15] = 255;
+        calib_data[16] = 1;    //255
+        calib_data[17] = 0;
+        //--- Radius registers --- 
+        calib_data[18] = 232;
+        calib_data[19] = 3;
+        calib_data[20] = 26;   //186
+        calib_data[21] = 4;     //2
+
+        bno.setSensorOffsets(calib_data);
         usleep(2000000); // hold on
+
+        euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", 1);
+        imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", 1); 
     }
-    
-    //int addr = 0x28; /* The I2C address */
-    if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
-    	exit(1);
-    }
-    
-    bno.setI2CPort(file);
 
-    while(!bno.begin(bno.OPERATION_MODE_NDOF)){
-        RCLCPP_INFO(this->get_logger(), "Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
-        usleep(2000000); // hold on
-    }
-    
-    bno.setExtCrystalUse(true);
-
-
-    
-    //IMU BNO055 Calibration data
-    /*
-        --- Accelerometer Offset registers ---
-    ACCEL_OFFSET_X_LSB_ADDR                                 = 0X55,
-    ACCEL_OFFSET_X_MSB_ADDR                                 = 0X56,
-    ACCEL_OFFSET_Y_LSB_ADDR                                 = 0X57,
-    ACCEL_OFFSET_Y_MSB_ADDR                                 = 0X58,
-    ACCEL_OFFSET_Z_LSB_ADDR                                 = 0X59,
-    ACCEL_OFFSET_Z_MSB_ADDR                                 = 0X5A,
-
-    --- Magnetometer Offset registers --- 
-    MAG_OFFSET_X_LSB_ADDR                                   = 0X5B,
-    MAG_OFFSET_X_MSB_ADDR                                   = 0X5C,
-    MAG_OFFSET_Y_LSB_ADDR                                   = 0X5D,
-    MAG_OFFSET_Y_MSB_ADDR                                   = 0X5E,
-    MAG_OFFSET_Z_LSB_ADDR                                   = 0X5F,
-    MAG_OFFSET_Z_MSB_ADDR                                   = 0X60,
-
-    --- Gyroscope Offset registers ---
-    GYRO_OFFSET_X_LSB_ADDR                                  = 0X61,
-    GYRO_OFFSET_X_MSB_ADDR                                  = 0X62,
-    GYRO_OFFSET_Y_LSB_ADDR                                  = 0X63,
-    GYRO_OFFSET_Y_MSB_ADDR                                  = 0X64,
-    GYRO_OFFSET_Z_LSB_ADDR                                  = 0X65,
-    GYRO_OFFSET_Z_MSB_ADDR                                  = 0X66,
-
-    --- Radius registers --- 
-    ACCEL_RADIUS_LSB_ADDR                                   = 0X67,
-    ACCEL_RADIUS_MSB_ADDR                                   = 0X68,
-    MAG_RADIUS_LSB_ADDR                                     = 0X69,
-    MAG_RADIUS_MSB_ADDR                                     = 0X6A
-    */
-
-    //--- Accelerometer Offset registers ---
-    calib_data[0] = 11;  //226
-    calib_data[1] = 0;   //255
-    calib_data[2] = 51;   //222
-    calib_data[3] = 0;    //255
-    calib_data[4] = 244;  //255
-    calib_data[5] = 255;
-    calib_data[6] = 213;  //240
-    //--- Magnetometer Offset registers --- 
-    calib_data[7] = 253;  //255
-    calib_data[8] = 11;   //93
-    calib_data[9] = 255;
-    calib_data[10] = 171;  //174
-    calib_data[11] = 255;  //254
-    calib_data[12] = 255;    //0
-    //--- Gyroscope Offset registers ---
-    calib_data[13] = 255;    //0
-    calib_data[14] = 254;    //254
-    calib_data[15] = 255;
-    calib_data[16] = 1;    //255
-    calib_data[17] = 0;
-    //--- Radius registers --- 
-    calib_data[18] = 232;
-    calib_data[19] = 3;
-    calib_data[20] = 26;   //186
-    calib_data[21] = 4;     //2
-
-    bno.setSensorOffsets(calib_data);
-    usleep(2000000); // hold on
-
-    //ROS2
-    barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", 1);
-    imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", 1);
-    euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", 1); 
+    //ROS2 timers
     timer_ = this->create_wall_timer(std::chrono::milliseconds(10),std::bind(&I2C_SENSORS::timerCallback, this)); //2hz
     timer_parameters_ = this->create_wall_timer(1000ms, std::bind(&I2C_SENSORS::get_parameters, this));
-    //RCLCPP_INFO(this->get_logger(), "Communication with arduino established");
-
-    //ROS2 Parameters
-    this->declare_parameter<bool>("read_sensor_quality", false);
-    this->declare_parameter<bool>("write_calibration", false);
 
     last_time = std::chrono::high_resolution_clock::now();
     RCLCPP_INFO(this->get_logger(), "Run!");
@@ -148,38 +166,41 @@ I2C_SENSORS::~I2C_SENSORS() {
 
 void I2C_SENSORS::get_parameters()
 {
-    readSensorQuality = this->get_parameter("read_sensor_quality").as_bool();
-    writeCalibration = this->get_parameter("write_calibration").as_bool(); 
-
-    //Read sensor quality data or setup calibration
-    if(readSensorQuality || writeCalibration)
+    if(useBNO055)
     {
-        //int addr = 0x28; /* The I2C address */
-        if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0)
-            RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
+        readSensorQuality = this->get_parameter("read_sensor_quality").as_bool();
+        writeCalibration = this->get_parameter("write_calibration").as_bool(); 
 
-        uint8_t system, gyro, accel, mag = 0;
-        bno.getCalibration(&system, &gyro, &accel, &mag);
-        //bno.getCalibationStatus(&system, &gyro, &accel, &mag);
-        std::cout<< "CALIBRATION: Sys=" << (int)system << " Gyro=" << (int)gyro
-            << " Accel=" << (int)accel << " Mag=" << (int)mag << std::endl;
-    
+        //Read sensor quality data or setup calibration
+        if(readSensorQuality || writeCalibration)
+        {
+            //int addr = 0x28; /* The I2C address */
+            if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0)
+                RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
+
+            uint8_t system, gyro, accel, mag = 0;
+            bno.getCalibration(&system, &gyro, &accel, &mag);
+            //bno.getCalibationStatus(&system, &gyro, &accel, &mag);
+            std::cout<< "CALIBRATION: Sys=" << (int)system << " Gyro=" << (int)gyro
+                << " Accel=" << (int)accel << " Mag=" << (int)mag << std::endl;
         
-        bno.getSensorOffsets(calib_data);
-        for(uint8_t i=0; i<NUM_BNO055_OFFSET_REGISTERS; i++)
-            printf("Hex: %d\n", calib_data[i]);
             
-        
-        if((int)mag == 3 && (int)gyro ==3 && (int)accel ==3 && writeCalibration){
-            //this->setBNO055_Calib_Data(); 
-            bno.setSensorOffsets(calib_data);
-            RCLCPP_INFO(this->get_logger(), "The BNO055 Sensor has been calibrated!");
+            bno.getSensorOffsets(calib_data);
+            for(uint8_t i=0; i<NUM_BNO055_OFFSET_REGISTERS; i++)
+                printf("Hex: %d\n", calib_data[i]);
+                
+            
+            if((int)mag == 3 && (int)gyro ==3 && (int)accel ==3 && writeCalibration){
+                //this->setBNO055_Calib_Data(); 
+                bno.setSensorOffsets(calib_data);
+                RCLCPP_INFO(this->get_logger(), "The BNO055 Sensor has been calibrated!");
 
-            this->set_parameters(
-            {
-                rclcpp::Parameter("read_sensor_quality", false),
-                rclcpp::Parameter("write_calibration", false),
-            });
+                this->set_parameters(
+                {
+                    rclcpp::Parameter("read_sensor_quality", false),
+                    rclcpp::Parameter("write_calibration", false),
+                });
+            }
         }
     }
 }
@@ -202,8 +223,10 @@ void I2C_SENSORS::Int2bytes(int value, uint8_t *bytes)
 
 void I2C_SENSORS::timerCallback()
 {
-    this->read_barometer();
-    this->read_BNO055();
+    if(useMS5837)
+        this->read_barometer();
+    if(useBNO055)
+        this->read_BNO055();
 }
 
 
