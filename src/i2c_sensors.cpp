@@ -274,6 +274,8 @@ void I2C_SENSORS::read_barometer()
 
                 //Publish barometer data
                 uuv_msgs::msg::Barometer baro_msg;
+                baro_msg.header.stamp = Node::now();
+                baro_msg.header.frame_id = "barometer_data_link";
                 baro_msg.depth = current_depth;
                 baro_msg.temperature = (double)ms5837.temperature();
                 baro_msg.pressure = (double)ms5837.pressure();
@@ -328,6 +330,8 @@ void I2C_SENSORS::read_BNO055()
 
         //----- Publish IMU data ----------------
         sensor_msgs::msg::Imu imu_msg;
+        imu_msg.header.stamp = Node::now();
+        imu_msg.header.frame_id = "imu_data_link";
         imu_msg.linear_acceleration.x = (double)imu_data.ax;
         imu_msg.linear_acceleration.y = (double)imu_data.ay;
         imu_msg.linear_acceleration.z = (double)imu_data.az;
@@ -338,6 +342,8 @@ void I2C_SENSORS::read_BNO055()
         
         //----- Publish Euler data  ----------------
         geometry_msgs::msg::Vector3Stamped euler_msg;
+        euler_msg.header.stamp = Node::now();
+        euler_msg.header.frame_id = "euler_data_link";
         euler_msg.vector.x = (double)euler_data.roll;
         euler_msg.vector.y = (double)euler_data.pitch;
         euler_msg.vector.z = (double)euler_data.yaw;  
