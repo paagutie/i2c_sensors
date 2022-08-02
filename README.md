@@ -7,7 +7,7 @@ For use in our systems (ARM Processors), arduino libraries such as the [Adafruit
 ## Requirements
 - [ROS2](https://docs.ros.org/en/galactic/Installation.html) - Galactic
 - Ubuntu 20.04
-- [uuv_msgs](https://github.com/MARUM-MUtTI/uuv_msgs.git)
+- [uuv_msgs](https://github.com/paagutie/uuv_msgs)
 - Tested on the NVIDIA Jetson Nano board.
 
 ## Installation
@@ -16,8 +16,8 @@ For use in our systems (ARM Processors), arduino libraries such as the [Adafruit
 $ source /opt/ros/galactic/setup.bash
 $ mkdir -p ~/ros2_ws/src
 $ cd ~/ros2_ws/src
-$ git clone https://github.com/MARUM-MUtTI/uuv_msgs.git
-$ git clone https://github.com/MARUM-MUtTI/i2c_sensors.git
+$ git clone https://github.com/paagutie/uuv_msgs.git
+$ git clone https://github.com/paagutie/i2c_sensors.git
 $ cd ..
 $ colcon build
 ```
