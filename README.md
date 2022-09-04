@@ -33,7 +33,7 @@ $ cd ~/ros2_ws
 $ source install/setup.bash
 $ ros2 run i2c_sensors i2c_sensors_node --ros-args -p i2c_bus_address:='/dev/i2c-1' -p use_ms5837:='false'
 ```
-#### Lifecycle management 
+#### Lifecycle management (Not recommended, under development)
 ROS 2 introduces the concept of managed nodes, also called LifecycleNodes. Managed nodes contain a state machine with a set of predefined states. These states can be changed by invoking a transition id which indicates the succeeding consecutive state.
 
 - The node must first be launched using composition. This allows multiple nodes to be executed in a single process with lower overhead and, optionally, more efficient communication (see [Intra Process Communication](https://docs.ros.org/en/foxy/Tutorials/Intra-Process-Communication.html)). The idea of using composition is to be able to make use of its advantages when integrating more than one node, which is the case of a robotic system.
@@ -68,7 +68,7 @@ $ ros2 lifecycle get /i2c_sensors_node
 inactive [2]
 ```
 
-#### Available transitions for this node using Lifecycle management
+##### Available transitions for this node using Lifecycle management
 ```
 $ ros2 lifecycle set /i2c_sensors_node activate
 $ ros2 lifecycle set /i2c_sensors_node deactivate
@@ -76,7 +76,7 @@ $ ros2 lifecycle set /i2c_sensors_node cleanup
 $ ros2 lifecycle set /i2c_sensors_node shutdown
 ```
 
-#### IMU Sensor calibration
+##### IMU Sensor calibration
 - To just read the quality of the IMU sensor data readout (It works only using the c++ node), open a new terminal:
 
 ```
@@ -97,6 +97,7 @@ $ ros2 param set /i2c_sensors_node write_calibration true
 ## ROS2 Topics 
 - `barometer/data`
 - `imu/data`
+- `imu/calib`
 - `euler/data`
 
 ## ROS2 Parameters 
