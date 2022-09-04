@@ -37,6 +37,7 @@
 #include "i2c_sensors/MS5837.hpp"
 #include "uuv_msgs/msg/barometer.hpp"
 #include "sensor_msgs/msg/imu.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "geometry_msgs/msg/vector3_stamped.hpp"
 
 
@@ -95,8 +96,8 @@ private:
     bool useMS5837;
     
     int loops = 0;
-    bool readSensorQuality = false;
     bool writeCalibration = false;
+    bool calibrationFlag = false;
 
     bool barometer_ready_ = false;
     double depth_adjustment_ = 0.0;
@@ -115,7 +116,7 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::TimerBase::SharedPtr timer_parameters_;
     //rclcpp::TimerBase::SharedPtr timer_barometer;
-    //rclcpp::Subscription<rov_msgs::msg::Control>::SharedPtr sub_control_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr imu_calib_sub_;
     rclcpp::Publisher<uuv_msgs::msg::Barometer>::SharedPtr barometer_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr euler_pub_; 
@@ -123,7 +124,7 @@ private:
     std::chrono::high_resolution_clock::time_point last_time;
 
     void timerCallback();
-    void get_parameters();
+    void call_imu_calibration(const std_msgs::msg::Bool::SharedPtr status);
     //void timerCallbackBarometer();
     //void topic_callback(const rov_msgs::msg::Control::SharedPtr msg);
 

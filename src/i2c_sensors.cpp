@@ -26,10 +26,7 @@ Node("i2c_sensors_node")
     useBNO055 = this->get_parameter("use_bno055").as_bool();
     useMS5837 = this->get_parameter("use_ms5837").as_bool();
 
-    this->declare_parameter<bool>("read_sensor_quality", false);
-    this->declare_parameter<bool>("write_calibration", false);   
 
-    
     calib_data = new uint8_t[22]; 
     filename = new char[15];
     
@@ -58,7 +55,7 @@ Node("i2c_sensors_node")
             usleep(2000000); // hold on
         }
 
-        barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", 1);
+        barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", 10);
     }
 
     if(useBNO055)
@@ -115,42 +112,42 @@ Node("i2c_sensors_node")
         */
 
         //--- Accelerometer Offset registers ---
-        calib_data[0] = 11;  //226
-        calib_data[1] = 0;   //255
-        calib_data[2] = 51;   //222
-        calib_data[3] = 0;    //255
-        calib_data[4] = 244;  //255
+        calib_data[0] = 14;   //226
+        calib_data[1] = 0;    //255
+        calib_data[2] = 252;  //222
+        calib_data[3] = 255;  //255
+        calib_data[4] = 219;  //255
         calib_data[5] = 255;
-        calib_data[6] = 213;  //240
+        calib_data[6] = 95;   //240
         //--- Magnetometer Offset registers --- 
-        calib_data[7] = 253;  //255
-        calib_data[8] = 11;   //93
-        calib_data[9] = 255;
-        calib_data[10] = 171;  //174
-        calib_data[11] = 255;  //254
-        calib_data[12] = 255;    //0
+        calib_data[7] = 255;  //255
+        calib_data[8] = 76;   //93
+        calib_data[9] = 1;
+        calib_data[10] = 175; //174
+        calib_data[11] = 255; //254
+        calib_data[12] = 0;   //0
         //--- Gyroscope Offset registers ---
-        calib_data[13] = 255;    //0
-        calib_data[14] = 254;    //254
+        calib_data[13] = 0;   //0
+        calib_data[14] = 254; //254
         calib_data[15] = 255;
-        calib_data[16] = 1;    //255
-        calib_data[17] = 0;
+        calib_data[16] = 255; //255
+        calib_data[17] = 255;
         //--- Radius registers --- 
         calib_data[18] = 232;
         calib_data[19] = 3;
-        calib_data[20] = 26;   //186
-        calib_data[21] = 4;     //2
+        calib_data[20] = 76; //186
+        calib_data[21] = 3;  //2
 
         bno.setSensorOffsets(calib_data);
         usleep(2000000); // hold on
 
-        euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", 1);
-        imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", 1); 
+        euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", 10);
+        imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", 10); 
+        imu_calib_sub_ = this->create_subscription<std_msgs::msg::Bool>("imu/calib", 5, std::bind(&I2C_SENSORS::call_imu_calibration, this, _1));
     }
 
     //ROS2 timers
     timer_ = this->create_wall_timer(std::chrono::milliseconds(10),std::bind(&I2C_SENSORS::timerCallback, this)); //2hz
-    timer_parameters_ = this->create_wall_timer(1000ms, std::bind(&I2C_SENSORS::get_parameters, this));
 
     last_time = std::chrono::high_resolution_clock::now();
     RCLCPP_INFO(this->get_logger(), "Run!");
@@ -164,47 +161,23 @@ I2C_SENSORS::~I2C_SENSORS() {
     //delete [] vector_data;
 }
 
-void I2C_SENSORS::get_parameters()
+void I2C_SENSORS::call_imu_calibration(const std_msgs::msg::Bool::SharedPtr status)
 {
     if(useBNO055)
     {
-        readSensorQuality = this->get_parameter("read_sensor_quality").as_bool();
-        writeCalibration = this->get_parameter("write_calibration").as_bool(); 
-
-        //Read sensor quality data or setup calibration
-        if(readSensorQuality || writeCalibration)
+        writeCalibration = status->data;
+        if(writeCalibration && !calibrationFlag)
         {
-            //int addr = 0x28; /* The I2C address */
-            if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0)
-                RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
-
-            uint8_t system, gyro, accel, mag = 0;
-            bno.getCalibration(&system, &gyro, &accel, &mag);
-            //bno.getCalibationStatus(&system, &gyro, &accel, &mag);
-            std::cout<< "CALIBRATION: Sys=" << (int)system << " Gyro=" << (int)gyro
-                << " Accel=" << (int)accel << " Mag=" << (int)mag << std::endl;
-        
-            
-            bno.getSensorOffsets(calib_data);
-            for(uint8_t i=0; i<NUM_BNO055_OFFSET_REGISTERS; i++)
-                printf("Hex: %d\n", calib_data[i]);
-                
-            
-            if((int)mag == 3 && (int)gyro ==3 && (int)accel ==3 && writeCalibration){
-                //this->setBNO055_Calib_Data(); 
-                bno.setSensorOffsets(calib_data);
-                RCLCPP_INFO(this->get_logger(), "The BNO055 Sensor has been calibrated!");
-
-                this->set_parameters(
-                {
-                    rclcpp::Parameter("read_sensor_quality", false),
-                    rclcpp::Parameter("write_calibration", false),
-                });
-            }
+            calibrationFlag = true;
+            RCLCPP_INFO(this->get_logger(), "The calibration process has been selected!");
+        }
+        else if(writeCalibration && calibrationFlag)
+        {
+            RCLCPP_INFO(this->get_logger(), "The calibration process has been cancelled!");
+            calibrationFlag = false;
         }
     }
 }
-
 
 
 void I2C_SENSORS::close_i2c()
@@ -226,14 +199,41 @@ void I2C_SENSORS::timerCallback()
     if(useMS5837)
         this->read_barometer();
     if(useBNO055)
+    {
         this->read_BNO055();
+        //Read sensor quality data or setup calibration
+        if(calibrationFlag)
+        {
+            //int addr = 0x28; /* The I2C address */
+            if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0)
+                RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
+
+            uint8_t system, gyro, accel, mag = 0;
+            bno.getCalibration(&system, &gyro, &accel, &mag);
+            //bno.getCalibationStatus(&system, &gyro, &accel, &mag);
+            std::cout<< "CALIBRATION: Sys=" << (int)system << " Gyro=" << (int)gyro
+                << " Accel=" << (int)accel << " Mag=" << (int)mag << std::endl;
+
+            bno.getSensorOffsets(calib_data);
+            for(uint8_t i=0; i<NUM_BNO055_OFFSET_REGISTERS; i++)
+                printf("Hex: %d\n", calib_data[i]);
+
+            if((int)mag == 3 && (int)gyro ==3 && (int)accel ==3){
+                //this->setBNO055_Calib_Data();
+                bno.setSensorOffsets(calib_data);
+                RCLCPP_INFO(this->get_logger(), "The BNO055 Sensor has been calibrated!");
+                calibrationFlag = false;
+            }
+        }
+
+    }
 }
 
 
 
 void I2C_SENSORS::read_barometer()
 {
-    if((!readSensorQuality && !writeCalibration))
+    if(!calibrationFlag)
     {
         std::chrono::high_resolution_clock::time_point current_time = std::chrono::high_resolution_clock::now();
         double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time).count();
@@ -300,7 +300,7 @@ void I2C_SENSORS::read_BNO055()
     if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0)
         RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
 
-    if((!readSensorQuality && !writeCalibration))
+    if(!calibrationFlag)
     {
         // Possible vector values can be:
         // - VECTOR_ACCELEROMETER - m/s^2

@@ -19,6 +19,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(uuv_msgs REQUIRED)
 #find_package(Eigen3 REQUIRED)
@@ -61,7 +62,8 @@ ament_target_dependencies(${PROJECT_NAME}_node
   "rclcpp"
   "uuv_msgs" 
   "sensor_msgs" 
-  "geometry_msgs")
+  "geometry_msgs"
+  "std_msgs")
 
 #Install C++ targets
 install(TARGETS
