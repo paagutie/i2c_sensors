@@ -143,7 +143,8 @@ Node("i2c_sensors_node")
 
         euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", 10);
         imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", 10); 
-        imu_calib_sub_ = this->create_subscription<std_msgs::msg::Bool>("imu/calib", 5, std::bind(&I2C_SENSORS::call_imu_calibration, this, _1));
+        imu_calib_sub_ = this->create_subscription<std_msgs::msg::Bool>("imu/calib/cmd", 5, std::bind(&I2C_SENSORS::call_imu_calibration, this, _1));
+        imu_calib_pub_ = this->create_publisher<std_msgs::msg::Bool>("imu/calib/status", 5);
     }
 
     //ROS2 timers
@@ -170,11 +171,16 @@ void I2C_SENSORS::call_imu_calibration(const std_msgs::msg::Bool::SharedPtr stat
         {
             calibrationFlag = true;
             RCLCPP_INFO(this->get_logger(), "The calibration process has been selected!");
+            imu_calib_status_msgs.data = true;
+            imu_calib_pub_->publish(imu_calib_status_msgs);
+
         }
         else if(writeCalibration && calibrationFlag)
         {
             RCLCPP_INFO(this->get_logger(), "The calibration process has been cancelled!");
             calibrationFlag = false;
+            imu_calib_status_msgs.data = false;
+            imu_calib_pub_->publish(imu_calib_status_msgs);
         }
     }
 }
@@ -223,6 +229,8 @@ void I2C_SENSORS::timerCallback()
                 bno.setSensorOffsets(calib_data);
                 RCLCPP_INFO(this->get_logger(), "The BNO055 Sensor has been calibrated!");
                 calibrationFlag = false;
+                imu_calib_status_msgs.data = false;
+                imu_calib_pub_->publish(imu_calib_status_msgs);
             }
         }
 

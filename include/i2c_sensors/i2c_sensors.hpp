@@ -109,6 +109,7 @@ private:
     uint8_t *buffer;
     util_tools::imu_t imu_data;
     util_tools::attitude_t euler_data;
+    std_msgs::msg::Bool imu_calib_status_msgs;
     
 
     
@@ -117,6 +118,7 @@ private:
     rclcpp::TimerBase::SharedPtr timer_parameters_;
     //rclcpp::TimerBase::SharedPtr timer_barometer;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr imu_calib_sub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr imu_calib_pub_;
     rclcpp::Publisher<uuv_msgs::msg::Barometer>::SharedPtr barometer_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr euler_pub_; 
