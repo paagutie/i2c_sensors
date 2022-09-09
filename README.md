@@ -97,7 +97,8 @@ $ ros2 param set /i2c_sensors_node write_calibration true
 ## ROS2 Topics 
 - `barometer/data`
 - `imu/data`
-- `imu/calib`
+- `imu/calib/cmd`
+- `imu/calib/status`
 - `euler/data`
 
 ## ROS2 Parameters 
