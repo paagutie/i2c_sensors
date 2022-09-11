@@ -15,6 +15,13 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+set(ROS_FOUND FALSE)
+if(DEFINED ENV{ROS_DISTRO})
+  set(FOUND_ROS_DISTRO $ENV{ROS_DISTRO})
+  set(ROS_FOUND TRUE)
+  message("ROS2 version found: $ENV{ROS_DISTRO}")
+endif()
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -40,8 +47,6 @@ file(GLOB SOURCE_FILES
  include/${PROJECT_NAME}/BNO055.h
  include/${PROJECT_NAME}/MS5837.hpp
 )
-
-
 
 add_library(i2c_sensors_component SHARED src/lifecycle_i2c_component.cpp ${SOURCE_FILES})
 target_compile_definitions(i2c_sensors_component PRIVATE "COMPOSITION_BUILDING_DLL")
@@ -84,11 +89,11 @@ install(TARGETS
 #file(GLOB SCRIPT_FILES scripts/*)
 install(PROGRAMS
   #${SCRIPT_FILES}
-  #scripts/dvl-A50.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
 #Install Launch file
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 
 ament_package()
