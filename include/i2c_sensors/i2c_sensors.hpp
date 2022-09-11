@@ -88,7 +88,7 @@ public:
 
 private:
     int n_writ;
-    uint8_t *calib_data;
+    uint8_t *default_calib;
     char *filename;
     int count_baro = 0;
     std::string i2c_address;

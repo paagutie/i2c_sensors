@@ -15,6 +15,9 @@ int file;
 I2C_SENSORS::I2C_SENSORS():
 Node("i2c_sensors_node")   
 {
+    default_calib = new uint8_t[22];
+    filename = new char[15];
+
     //ROS2 Parameters
     this->declare_parameter<std::string>("i2c_bus_address", "/dev/i2c-1");
     i2c_address = this->get_parameter("i2c_bus_address").as_string();
@@ -26,10 +29,49 @@ Node("i2c_sensors_node")
     useBNO055 = this->get_parameter("use_bno055").as_bool();
     useMS5837 = this->get_parameter("use_ms5837").as_bool();
 
+    //IMU BNO055 Calibration data
+    /*
+    --- Accelerometer Offset registers ---
+    ACCEL_OFFSET_X_LSB_ADDR                                 = 0X55,
+    ACCEL_OFFSET_X_MSB_ADDR                                 = 0X56,
+    ACCEL_OFFSET_Y_LSB_ADDR                                 = 0X57,
+    ACCEL_OFFSET_Y_MSB_ADDR                                 = 0X58,
+    ACCEL_OFFSET_Z_LSB_ADDR                                 = 0X59,
+    ACCEL_OFFSET_Z_MSB_ADDR                                 = 0X5A,
 
-    calib_data = new uint8_t[22]; 
-    filename = new char[15];
-    
+    --- Magnetometer Offset registers ---
+    MAG_OFFSET_X_LSB_ADDR                                   = 0X5B,
+    MAG_OFFSET_X_MSB_ADDR                                   = 0X5C,
+    MAG_OFFSET_Y_LSB_ADDR                                   = 0X5D,
+    MAG_OFFSET_Y_MSB_ADDR                                   = 0X5E,
+    MAG_OFFSET_Z_LSB_ADDR                                   = 0X5F,
+    MAG_OFFSET_Z_MSB_ADDR                                   = 0X60,
+
+    --- Gyroscope Offset registers ---
+    GYRO_OFFSET_X_LSB_ADDR                                  = 0X61,
+    GYRO_OFFSET_X_MSB_ADDR                                  = 0X62,
+    GYRO_OFFSET_Y_LSB_ADDR                                  = 0X63,
+    GYRO_OFFSET_Y_MSB_ADDR                                  = 0X64,
+    GYRO_OFFSET_Z_LSB_ADDR                                  = 0X65,
+    GYRO_OFFSET_Z_MSB_ADDR                                  = 0X66,
+
+    --- Radius registers ---
+    ACCEL_RADIUS_LSB_ADDR                                   = 0X67,
+    ACCEL_RADIUS_MSB_ADDR                                   = 0X68,
+    MAG_RADIUS_LSB_ADDR                                     = 0X69,
+    MAG_RADIUS_MSB_ADDR                                     = 0X6A
+    */
+
+
+    this->declare_parameter("bno055_calib_params", std::vector<long int>({234, 255, 221, 255, 217, 255, //--- Accelerometer Offset registers ---
+                                                                          154, 255, 125, 1,   159, 255, //--- Magnetometer Offset registers ---
+                                                                          0,   0,   254, 255, 0,   0,   //--- Gyroscope Offset registers ---
+                                                                          232, 3,   86,  3}));          //--- Radius registers ---
+
+    std::vector<long int> calibration_params = this->get_parameter("bno055_calib_params").as_integer_array();
+    for(uint8_t i=0; i< (uint8_t)calibration_params.size(); i++)
+        default_calib[i] = (uint8_t)calibration_params[i];
+
     sprintf(filename,(char*)i2c_address.c_str());
     file = open(filename, O_RDWR);
  
@@ -75,70 +117,8 @@ Node("i2c_sensors_node")
         }
         
         bno.setExtCrystalUse(true);
-
-
-        
-        //IMU BNO055 Calibration data
-        /*
-            --- Accelerometer Offset registers ---
-        ACCEL_OFFSET_X_LSB_ADDR                                 = 0X55,
-        ACCEL_OFFSET_X_MSB_ADDR                                 = 0X56,
-        ACCEL_OFFSET_Y_LSB_ADDR                                 = 0X57,
-        ACCEL_OFFSET_Y_MSB_ADDR                                 = 0X58,
-        ACCEL_OFFSET_Z_LSB_ADDR                                 = 0X59,
-        ACCEL_OFFSET_Z_MSB_ADDR                                 = 0X5A,
-
-        --- Magnetometer Offset registers --- 
-        MAG_OFFSET_X_LSB_ADDR                                   = 0X5B,
-        MAG_OFFSET_X_MSB_ADDR                                   = 0X5C,
-        MAG_OFFSET_Y_LSB_ADDR                                   = 0X5D,
-        MAG_OFFSET_Y_MSB_ADDR                                   = 0X5E,
-        MAG_OFFSET_Z_LSB_ADDR                                   = 0X5F,
-        MAG_OFFSET_Z_MSB_ADDR                                   = 0X60,
-
-        --- Gyroscope Offset registers ---
-        GYRO_OFFSET_X_LSB_ADDR                                  = 0X61,
-        GYRO_OFFSET_X_MSB_ADDR                                  = 0X62,
-        GYRO_OFFSET_Y_LSB_ADDR                                  = 0X63,
-        GYRO_OFFSET_Y_MSB_ADDR                                  = 0X64,
-        GYRO_OFFSET_Z_LSB_ADDR                                  = 0X65,
-        GYRO_OFFSET_Z_MSB_ADDR                                  = 0X66,
-
-        --- Radius registers --- 
-        ACCEL_RADIUS_LSB_ADDR                                   = 0X67,
-        ACCEL_RADIUS_MSB_ADDR                                   = 0X68,
-        MAG_RADIUS_LSB_ADDR                                     = 0X69,
-        MAG_RADIUS_MSB_ADDR                                     = 0X6A
-        */
-
-        //--- Accelerometer Offset registers ---
-        calib_data[0] = 14;   //226
-        calib_data[1] = 0;    //255
-        calib_data[2] = 252;  //222
-        calib_data[3] = 255;  //255
-        calib_data[4] = 219;  //255
-        calib_data[5] = 255;
-        calib_data[6] = 95;   //240
-        //--- Magnetometer Offset registers --- 
-        calib_data[7] = 255;  //255
-        calib_data[8] = 76;   //93
-        calib_data[9] = 1;
-        calib_data[10] = 175; //174
-        calib_data[11] = 255; //254
-        calib_data[12] = 0;   //0
-        //--- Gyroscope Offset registers ---
-        calib_data[13] = 0;   //0
-        calib_data[14] = 254; //254
-        calib_data[15] = 255;
-        calib_data[16] = 255; //255
-        calib_data[17] = 255;
-        //--- Radius registers --- 
-        calib_data[18] = 232;
-        calib_data[19] = 3;
-        calib_data[20] = 76; //186
-        calib_data[21] = 3;  //2
-
-        bno.setSensorOffsets(calib_data);
+        //Set default calibration
+        bno.setSensorOffsets(default_calib);
         usleep(2000000); // hold on
 
         euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", 10);
@@ -158,7 +138,7 @@ I2C_SENSORS::~I2C_SENSORS() {
 
     delete [] filename;
     delete [] buffer;
-    delete [] calib_data;
+    delete [] default_calib;
     //delete [] vector_data;
 }
 
@@ -220,13 +200,13 @@ void I2C_SENSORS::timerCallback()
             std::cout<< "CALIBRATION: Sys=" << (int)system << " Gyro=" << (int)gyro
                 << " Accel=" << (int)accel << " Mag=" << (int)mag << std::endl;
 
-            bno.getSensorOffsets(calib_data);
-            for(uint8_t i=0; i<NUM_BNO055_OFFSET_REGISTERS; i++)
-                printf("Hex: %d\n", calib_data[i]);
+            bno.getSensorOffsets(default_calib);
+
 
             if((int)mag == 3 && (int)gyro ==3 && (int)accel ==3){
-                //this->setBNO055_Calib_Data();
-                bno.setSensorOffsets(calib_data);
+                for(uint8_t i=0; i<NUM_BNO055_OFFSET_REGISTERS; i++)
+                    printf("Hex: %d\n", default_calib[i]);
+                bno.setSensorOffsets(default_calib);
                 RCLCPP_INFO(this->get_logger(), "The BNO055 Sensor has been calibrated!");
                 calibrationFlag = false;
                 imu_calib_status_msgs.data = false;
