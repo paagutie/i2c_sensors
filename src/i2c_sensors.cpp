@@ -78,6 +78,16 @@ Node("i2c_sensors_node")
     bno = Adafruit_BNO055();
     ms5837 = MS5837();
 
+    //ROS2 QoS
+    rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
+
+    auto qos = rclcpp::QoS(
+        rclcpp::QoSInitialization(
+            qos_profile.history,
+            qos_profile.depth
+            ),
+        qos_profile);
+
     if(useMS5837)
     {
         RCLCPP_INFO(get_logger(), "The pressure sensor has been selected.");
@@ -97,7 +107,7 @@ Node("i2c_sensors_node")
             usleep(2000000); // hold on
         }
 
-        barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", 10);
+        barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", qos);
     }
 
     if(useBNO055)
@@ -121,8 +131,8 @@ Node("i2c_sensors_node")
         bno.setSensorOffsets(default_calib);
         usleep(2000000); // hold on
 
-        euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", 10);
-        imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", 10); 
+        euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", qos);
+        imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", qos);
         imu_calib_sub_ = this->create_subscription<std_msgs::msg::Bool>("imu/calib/cmd", 5, std::bind(&I2C_SENSORS::call_imu_calibration, this, _1));
         imu_calib_pub_ = this->create_publisher<std_msgs::msg::Bool>("imu/calib/status", 5);
     }
