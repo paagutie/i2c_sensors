@@ -133,6 +133,7 @@ Node("i2c_sensors_node")
 
         euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", qos);
         imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", qos);
+        mag_pub_ = this->create_publisher<sensor_msgs::msg::MagneticField>("mag/data", qos);
         imu_calib_sub_ = this->create_subscription<std_msgs::msg::Bool>("imu/calib/cmd", 5, std::bind(&I2C_SENSORS::call_imu_calibration, this, _1));
         imu_calib_pub_ = this->create_publisher<std_msgs::msg::Bool>("imu/calib/status", 5);
     }
@@ -307,9 +308,10 @@ void I2C_SENSORS::read_BNO055()
         // - VECTOR_EULER         - degrees
         // - VECTOR_LINEARACCEL   - m/s^2
         // - VECTOR_GRAVITY       - m/s^2
-        imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER); 
+        //imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER); 
         imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
         imu::Vector<3> acc = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+        imu::Vector<3> mag = bno.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);
         //ENU frame
         imu::Quaternion quat = bno.getQuat();
 
@@ -370,9 +372,19 @@ void I2C_SENSORS::read_BNO055()
         euler_msg.vector.x = (double)euler_data.roll;
         euler_msg.vector.y = (double)euler_data.pitch;
         euler_msg.vector.z = (double)euler_data.yaw;
+
+        //----- Publish Manetometer data  ----------------
+        sensor_msgs::msg::MagneticField mag_msg;
+        mag_msg.header.stamp = Node::now();
+        mag_msg.header.frame_id = "mag_data_link";
+        // Magnetic field in Tesla
+        mag_msg.magnetic_field.x = (double)mag.x() * 1e-6;
+        mag_msg.magnetic_field.y = (double)mag.y() * 1e-6;
+        mag_msg.magnetic_field.z = (double)mag.z() * 1e-6;
         
         euler_pub_->publish(euler_msg);
         imu_pub_->publish(imu_msg);
+        mag_pub_->publish(mag_msg);
     }
 }
 
