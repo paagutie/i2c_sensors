@@ -40,6 +40,9 @@
 #include "std_msgs/msg/bool.hpp"
 #include "geometry_msgs/msg/vector3_stamped.hpp"
 
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;

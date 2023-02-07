@@ -310,11 +310,30 @@ void I2C_SENSORS::read_BNO055()
         imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER); 
         imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
         imu::Vector<3> acc = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+        //ENU frame
+        imu::Quaternion quat = bno.getQuat();
+
+        //Change frame orientation from ENU to NED
+        tf2::Quaternion q_rot, q_new;
+        tf2::Quaternion q_orig(quat.x(), quat.y(), quat.z(), quat.w());
+        // Rotate the previous sensor pose by 180° about X and -90° about Z
+        q_rot.setRPY(M_PI, 0.0, -M_PI/2);
+
+        q_new = q_rot * q_orig;
+        q_new.normalize();
+         
+        tf2::Matrix3x3 m(q_new);
+        double roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
 
 
+        if(yaw < 0)
+          yaw += 2.0*M_PI;
+          
+        //NED frame (x=north, y=west, z=down)
         imu_data.clear();
-        imu_data.gx = -(float)gyro.y();
-        imu_data.gy = -(float)gyro.x();
+        imu_data.gx = (float)gyro.x();
+        imu_data.gy = (float)gyro.y();
         imu_data.gz = (float)gyro.z();
 
         imu_data.ax = (float)acc.x();
@@ -322,14 +341,20 @@ void I2C_SENSORS::read_BNO055()
         imu_data.az = (float)acc.z();
         
         euler_data.clear();
-        euler_data.roll = (float)euler.y();
-        euler_data.pitch = -(float)euler.z();
-        euler_data.yaw = (float)euler.x();
+        euler_data.roll = roll*180.0/M_PI; 
+        euler_data.pitch = pitch*180.0/M_PI; 
+        euler_data.yaw = yaw*180.0/M_PI;
 
         //----- Publish IMU data ----------------
         sensor_msgs::msg::Imu imu_msg;
         imu_msg.header.stamp = Node::now();
         imu_msg.header.frame_id = "imu_data_link";
+        
+        imu_msg.orientation.x = q_new[0];
+        imu_msg.orientation.y = q_new[1];
+        imu_msg.orientation.z = q_new[2];
+        imu_msg.orientation.w = q_new[3];
+        
         imu_msg.linear_acceleration.x = (double)imu_data.ax;
         imu_msg.linear_acceleration.y = (double)imu_data.ay;
         imu_msg.linear_acceleration.z = (double)imu_data.az;
@@ -344,7 +369,7 @@ void I2C_SENSORS::read_BNO055()
         euler_msg.header.frame_id = "euler_data_link";
         euler_msg.vector.x = (double)euler_data.roll;
         euler_msg.vector.y = (double)euler_data.pitch;
-        euler_msg.vector.z = (double)euler_data.yaw;  
+        euler_msg.vector.z = (double)euler_data.yaw;
         
         euler_pub_->publish(euler_msg);
         imu_pub_->publish(imu_msg);
