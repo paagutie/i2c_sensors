@@ -101,10 +101,19 @@ Node("i2c_sensors_node")
 
         ms5837.setPort(file);
         
+        rclcpp::Time time_begin = this->now();
         while (!ms5837.init()) {
             RCLCPP_INFO(this->get_logger(), "Are SDA/SCL connected correctly?");
             RCLCPP_INFO(this->get_logger(), "Blue Robotics Bar30: White=SDA, Green=SCL");
-            usleep(2000000); // hold on
+
+            rclcpp::Time time_end = this->now();
+            rclcpp::Duration duration = time_end - time_begin;
+            if(duration.seconds() >= 30.0)
+            {
+                RCLCPP_ERROR(this->get_logger(), "Error when initializing the MS5837 sensor.");
+                exit(2);
+            }
+            usleep(2000000);
         }
 
         barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", qos);
@@ -118,12 +127,22 @@ Node("i2c_sensors_node")
             RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
             exit(1);
         }
-        
+
         bno.setI2CPort(file);
 
+        rclcpp::Time time_begin = this->now();
         while(!bno.begin(bno.OPERATION_MODE_NDOF)){
             RCLCPP_INFO(this->get_logger(), "Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
-            usleep(2000000); // hold on
+
+            rclcpp::Time time_end = this->now();
+            rclcpp::Duration duration = time_end - time_begin;
+            if(duration.seconds() >= 30.0)
+            {
+              RCLCPP_ERROR(this->get_logger(), "Error when initializing the BNO055 sensor.");
+              exit(2);
+            }
+
+            usleep(2000000);
         }
         
         bno.setExtCrystalUse(true);
