@@ -337,8 +337,8 @@ void I2C_SENSORS::read_BNO055()
         //Change frame orientation from ENU to NED
         tf2::Quaternion q_rot, q_new;
         tf2::Quaternion q_orig(quat.x(), quat.y(), quat.z(), quat.w());
-        // Rotate the previous sensor pose by 180° about X and -90° about Z
-        q_rot.setRPY(M_PI, 0.0, -M_PI/2);
+        // Rotate the previous sensor pose by 180° about X and 90° about Z
+        q_rot.setRPY(M_PI, 0.0, M_PI/2);
 
         q_new = q_rot * q_orig;
         q_new.normalize();
