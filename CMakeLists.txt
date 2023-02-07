@@ -33,6 +33,7 @@ find_package(uuv_msgs REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
+find_package(tf2 REQUIRED)
 
 
 
@@ -68,7 +69,8 @@ ament_target_dependencies(${PROJECT_NAME}_node
   "uuv_msgs" 
   "sensor_msgs" 
   "geometry_msgs"
-  "std_msgs")
+  "std_msgs"
+  "tf2")
 
 #Install C++ targets
 install(TARGETS
