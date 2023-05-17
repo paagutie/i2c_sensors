@@ -23,11 +23,21 @@ Node("i2c_sensors_node")
     i2c_address = this->get_parameter("i2c_bus_address").as_string();
     RCLCPP_INFO(get_logger(), "I2C_BUS_ADDRESS: '%s'", i2c_address.c_str());
 
-    this->declare_parameter<bool>("use_bno055", true);
-    this->declare_parameter<bool>("use_ms5837", true);
+    this->declare_parameter<bool>("pressure_sensor.use_ms5837", false);
+    this->declare_parameter<bool>("pressure_sensor.use_kellerLD", true);
+    this->declare_parameter<std::string>("pressure_sensor.frame_id", "");
+    this->declare_parameter<bool>("bno055_sensor.use_bno055", true);
+    this->declare_parameter<std::string>("bno055_sensor.imu_frame_id", "");
+    this->declare_parameter<std::string>("bno055_sensor.mag_frame_id", "");
+    this->declare_parameter<std::string>("bno055_sensor.euler_frame_id", "");
 
-    useBNO055 = this->get_parameter("use_bno055").as_bool();
-    useMS5837 = this->get_parameter("use_ms5837").as_bool();
+    useMS5837 = this->get_parameter("pressure_sensor.use_ms5837").as_bool();
+    useKellerLD = this->get_parameter("pressure_sensor.use_kellerLD").as_bool();
+    pressure_frame_id = this->get_parameter("pressure_sensor.frame_id").as_string();
+    useBNO055 = this->get_parameter("bno055_sensor.use_bno055").as_bool();
+    imu_frame_id = this->get_parameter("bno055_sensor.imu_frame_id").as_string();
+    mag_frame_id = this->get_parameter("bno055_sensor.mag_frame_id").as_string();
+    euler_frame_id = this->get_parameter("bno055_sensor.euler_frame_id").as_string();
 
     //IMU BNO055 Calibration data
     /*
@@ -63,21 +73,18 @@ Node("i2c_sensors_node")
     */
 
 
-    this->declare_parameter("bno055_calib_params", std::vector<long int>({234, 255, 221, 255, 217, 255, //--- Accelerometer Offset registers ---
-                                                                          154, 255, 125, 1,   159, 255, //--- Magnetometer Offset registers ---
-                                                                          0,   0,   254, 255, 0,   0,   //--- Gyroscope Offset registers ---
-                                                                          232, 3,   86,  3}));          //--- Radius registers ---
+    this->declare_parameter("imu_sensor.bno055_calib_params", std::vector<long int>({234, 255, 221, 255, 217, 255, //--- Accelerometer Offset registers ---
+                                                                                     154, 255, 125, 1,   159, 255, //--- Magnetometer Offset registers ---
+                                                                                     0,   0,   254, 255, 0,   0,   //--- Gyroscope Offset registers ---
+                                                                                     232, 3,   86,  3}));          //--- Radius registers ---
 
-    std::vector<long int> calibration_params = this->get_parameter("bno055_calib_params").as_integer_array();
+    std::vector<long int> calibration_params = this->get_parameter("imu_sensor.bno055_calib_params").as_integer_array();
     for(uint8_t i=0; i< (uint8_t)calibration_params.size(); i++)
         default_calib[i] = (uint8_t)calibration_params[i];
 
     sprintf(filename,(char*)i2c_address.c_str());
     file = open(filename, O_RDWR);
  
-    bno = Adafruit_BNO055();
-    ms5837 = MS5837();
-
     //ROS2 QoS
     rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 
@@ -90,7 +97,9 @@ Node("i2c_sensors_node")
 
     if(useMS5837)
     {
-        RCLCPP_INFO(get_logger(), "The pressure sensor has been selected.");
+        ms5837 = std::make_unique<MS5837>();
+
+        RCLCPP_INFO(get_logger(), "MS5837 pressure sensor has been selected.");
         //int addr = 0x76; The I2C address
         if (ioctl(file, I2C_SLAVE, MS5837_ADDR) < 0) 
         {
@@ -99,12 +108,12 @@ Node("i2c_sensors_node")
             exit(1);
         }
 
-        ms5837.setPort(file);
+        ms5837->setPort(file);
         
         rclcpp::Time time_begin = this->now();
-        while (!ms5837.init()) {
+        while (!ms5837->init()) {
             RCLCPP_INFO(this->get_logger(), "Are SDA/SCL connected correctly?");
-            RCLCPP_INFO(this->get_logger(), "Blue Robotics Bar30: White=SDA, Green=SCL");
+            RCLCPP_INFO(this->get_logger(), "BlueRobotics Bar30: White=SDA, Green=SCL");
 
             rclcpp::Time time_end = this->now();
             rclcpp::Duration duration = time_end - time_begin;
@@ -118,9 +127,44 @@ Node("i2c_sensors_node")
 
         barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", qos);
     }
+    else if(useKellerLD)
+    {
+        RCLCPP_INFO(get_logger(), "KellerLD pressure sensor has been selected.");
+        if (ioctl(file, I2C_SLAVE, LD_ADDR) < 0) 
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to KellerLD.");
+            exit(1);
+        }
+
+        kellerLD = std::make_unique<KellerLD>();
+        kellerLD->setI2CPort(file);
+        kellerLD->init();
+        
+        rclcpp::Time time_begin = this->now();
+        while (!kellerLD->isInitialized()) {
+            RCLCPP_INFO(this->get_logger(), "Are SDA/SCL connected correctly?");
+            RCLCPP_INFO(this->get_logger(), "BlueRobotics Bar100: White=SDA, Green=SCL");
+
+            rclcpp::Time time_end = this->now();
+            rclcpp::Duration duration = time_end - time_begin;
+            if(duration.seconds() >= 30.0)
+            {
+                RCLCPP_ERROR(this->get_logger(), "Error when initializing the MS5837 sensor.");
+                exit(2);
+            }
+
+            kellerLD->init();
+            usleep(2000000);
+        }
+
+        barometer_pub_ = this->create_publisher<uuv_msgs::msg::Barometer>("barometer/data", qos);
+
+    }
 
     if(useBNO055)
     {
+        bno = std::make_unique<Adafruit_BNO055>();
+
         RCLCPP_INFO(get_logger(), "The IMU sensor has been selected.");
         //int addr = 0x28; /* The I2C address */
         if (ioctl(file, I2C_SLAVE, BNO055_ADDRESS_A) < 0) {
@@ -128,10 +172,10 @@ Node("i2c_sensors_node")
             exit(1);
         }
 
-        bno.setI2CPort(file);
+        bno->setI2CPort(file);
 
         rclcpp::Time time_begin = this->now();
-        while(!bno.begin(bno.OPERATION_MODE_NDOF)){
+        while(!bno->begin(bno->OPERATION_MODE_NDOF)){
             RCLCPP_INFO(this->get_logger(), "Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
 
             rclcpp::Time time_end = this->now();
@@ -145,9 +189,9 @@ Node("i2c_sensors_node")
             usleep(2000000);
         }
         
-        bno.setExtCrystalUse(true);
+        bno->setExtCrystalUse(true);
         //Set default calibration
-        bno.setSensorOffsets(default_calib);
+        bno->setSensorOffsets(default_calib);
         usleep(2000000); // hold on
 
         euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", qos);
@@ -169,7 +213,6 @@ I2C_SENSORS::~I2C_SENSORS() {
     delete [] filename;
     delete [] buffer;
     delete [] default_calib;
-    //delete [] vector_data;
 }
 
 void I2C_SENSORS::call_imu_calibration(const std_msgs::msg::Bool::SharedPtr status)
@@ -212,7 +255,7 @@ void I2C_SENSORS::Int2bytes(int value, uint8_t *bytes)
 
 void I2C_SENSORS::timerCallback()
 {
-    if(useMS5837)
+    if(useMS5837 || useKellerLD)
         this->read_barometer();
     if(useBNO055)
     {
@@ -225,18 +268,18 @@ void I2C_SENSORS::timerCallback()
                 RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to BNO055!");
 
             uint8_t system, gyro, accel, mag = 0;
-            bno.getCalibration(&system, &gyro, &accel, &mag);
+            bno->getCalibration(&system, &gyro, &accel, &mag);
             //bno.getCalibationStatus(&system, &gyro, &accel, &mag);
             std::cout<< "CALIBRATION: Sys=" << (int)system << " Gyro=" << (int)gyro
                 << " Accel=" << (int)accel << " Mag=" << (int)mag << std::endl;
 
-            bno.getSensorOffsets(default_calib);
+            bno->getSensorOffsets(default_calib);
 
 
             if((int)mag == 3 && (int)gyro ==3 && (int)accel ==3){
                 for(uint8_t i=0; i<NUM_BNO055_OFFSET_REGISTERS; i++)
                     printf("Hex: %d\n", default_calib[i]);
-                bno.setSensorOffsets(default_calib);
+                bno->setSensorOffsets(default_calib);
                 RCLCPP_INFO(this->get_logger(), "The BNO055 Sensor has been calibrated!");
                 calibrationFlag = false;
                 imu_calib_status_msgs.data = false;
@@ -254,60 +297,100 @@ void I2C_SENSORS::read_barometer()
     if(!calibrationFlag)
     {
         std::chrono::high_resolution_clock::time_point current_time = std::chrono::high_resolution_clock::now();
-        double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time).count();
-
-        //int addr = 0x76; The I2C address
-        if (ioctl(file, I2C_SLAVE, MS5837_ADDR) < 0) 
-            RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to MS5837.");
-
-        if(dt >= 20) //19 (22.10.21)
+        if(useMS5837)
         {
-            loops++;
-            if(loops == 1)
-                ms5837.read_sensor_part1(); 
-            else if(loops == 2)
-                ms5837.read_sensor_part2();  
-            else if(loops == 3){
-                ms5837.read_sensor_part3();
-                ms5837.pressure();
+            //int addr = 0x76; The I2C address
+            if (ioctl(file, I2C_SLAVE, MS5837_ADDR) < 0) 
+                RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to MS5837.");
 
-                depth = (double)ms5837.depth();
+            if(!ms5837WaitingForData)
+            {
+                ms5837->read_sensor_part1();
+                ms5837WaitingForData = true;
+                last_time = current_time;
+            }
 
-                if(!barometer_ready_)
-                {
+            double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time).count();
+            if(dt >= 20) //19 (22.10.21)
+            {
+                loops++;
+                if(loops == 1)
+                    ms5837->read_sensor_part2();  
+                else if(loops == 2){
+                    ms5837->read_sensor_part3();
+                    ms5837->pressure();
+
+                    depth = (double)ms5837->depth();
+
+                    if(!barometer_ready_)
+                    {
+                        if(depth < 0)
+                            depth *= -1;
+                        depth_adjustment_ = depth;
+                        barometer_ready_ = true;
+                        RCLCPP_INFO(this->get_logger(), "Barometer ready, depth adjustment: '%6.2F'", depth_adjustment_);
+                    }
+
+                
                     if(depth < 0)
-                        depth *= -1;
-                    depth_adjustment_ = depth;
-                    barometer_ready_ = true;
-                    RCLCPP_INFO(this->get_logger(), "Barometer ready, depth adjustment: '%6.2F'", depth_adjustment_);
+                        current_depth = depth + depth_adjustment_;
+                    else if(depth >= 0.0)
+                        current_depth = depth - depth_adjustment_;
+
+                    //RCLCPP_INFO(this->get_logger(), "Current depth: '%6.2F'", depth);
+
+                    //Publish barometer data
+                    uuv_msgs::msg::Barometer baro_msg;
+                    baro_msg.header.stamp = Node::now();
+                    baro_msg.header.frame_id = pressure_frame_id;
+                    baro_msg.depth = current_depth;
+                    baro_msg.temperature = (double)ms5837->temperature();
+                    baro_msg.pressure = (double)ms5837->pressure();
+
+                    barometer_pub_->publish(baro_msg);
+                    ms5837WaitingForData = false;
+                    loops = 0;
+                }
+                last_time = current_time;   
+            }
+        }
+        else if(useKellerLD)
+        {
+            if (ioctl(file, I2C_SLAVE, LD_ADDR) < 0) 
+                RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to KellerLD.");
+            else
+            {
+                if(!kellerWaitingForData)
+                {
+                    if(kellerLD->read_request() != 99)
+                      kellerWaitingForData = true;
+                    else RCLCPP_ERROR(this->get_logger(), "KellerLD: Failed to write 1 byte to the i2c bus.");
+                    last_time = current_time;
                 }
 
-            
-                if(depth < 0)
-                    current_depth = depth + depth_adjustment_;
-                else if(depth >= 0.0)
-                    current_depth = depth - depth_adjustment_;
+                double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time).count();
+                if(dt >= 9)
+                {
+                    uint8_t status = kellerLD->read_data();
+                    if(status != 99)
+                    {
+                        //Publish barometer data
+                        uuv_msgs::msg::Barometer baro_msg;
+                        baro_msg.header.stamp = Node::now();
+                        baro_msg.header.frame_id = pressure_frame_id;
+                        baro_msg.depth = (double)kellerLD->depth();
+                        baro_msg.temperature = (double)kellerLD->temperature();
+                        baro_msg.pressure = (double)kellerLD->pressure(KellerLD::bar);
 
-                //RCLCPP_INFO(this->get_logger(), "Current depth: '%6.2F'", depth);
-
-                //Publish barometer data
-                uuv_msgs::msg::Barometer baro_msg;
-                baro_msg.header.stamp = Node::now();
-                baro_msg.header.frame_id = "barometer_data_link";
-                baro_msg.depth = current_depth;
-                baro_msg.temperature = (double)ms5837.temperature();
-                baro_msg.pressure = (double)ms5837.pressure();
-
-                barometer_pub_->publish(baro_msg);
-                loops = 0;
-            }  
-            last_time = current_time;   
+                        barometer_pub_->publish(baro_msg);
+                        kellerWaitingForData = false;
+                    }
+                    else RCLCPP_ERROR(this->get_logger(), "KellerLD: Failed to read 5 bytes from the i2c bus.");
+                    last_time = current_time;
+                }
+                
+            }
         }
-
-
-        //RCLCPP_INFO(this->get_logger(), "Depth: '%6.2F' Curr Depth: '%6.2F'", depth, current_depth);
-        //RCLCPP_INFO(this->get_logger(), "Temperature: '%6.2F'", ms5837.temperature());
-        //RCLCPP_INFO(this->get_logger(), "Pressure: '%6.2F'", ms5837.pressure());
     }
     
 }
@@ -328,11 +411,11 @@ void I2C_SENSORS::read_BNO055()
         // - VECTOR_LINEARACCEL   - m/s^2
         // - VECTOR_GRAVITY       - m/s^2
         //imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER); 
-        imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
-        imu::Vector<3> acc = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
-        imu::Vector<3> mag = bno.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);
+        imu::Vector<3> gyro = bno->getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
+        imu::Vector<3> acc = bno->getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+        imu::Vector<3> mag = bno->getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);
         //ENU frame
-        imu::Quaternion quat = bno.getQuat();
+        imu::Quaternion quat = bno->getQuat();
 
         //Change frame orientation from ENU to NED
         tf2::Quaternion q_rot, q_new;
@@ -369,7 +452,7 @@ void I2C_SENSORS::read_BNO055()
         //----- Publish IMU data ----------------
         sensor_msgs::msg::Imu imu_msg;
         imu_msg.header.stamp = Node::now();
-        imu_msg.header.frame_id = "imu_data_link";
+        imu_msg.header.frame_id = imu_frame_id;
         
         imu_msg.orientation.x = q_new[0];
         imu_msg.orientation.y = q_new[1];
@@ -387,7 +470,7 @@ void I2C_SENSORS::read_BNO055()
         //----- Publish Euler data  ----------------
         geometry_msgs::msg::Vector3Stamped euler_msg;
         euler_msg.header.stamp = Node::now();
-        euler_msg.header.frame_id = "euler_data_link";
+        euler_msg.header.frame_id = euler_frame_id;
         euler_msg.vector.x = (double)euler_data.roll;
         euler_msg.vector.y = (double)euler_data.pitch;
         euler_msg.vector.z = (double)euler_data.yaw;
@@ -395,7 +478,7 @@ void I2C_SENSORS::read_BNO055()
         //----- Publish Manetometer data  ----------------
         sensor_msgs::msg::MagneticField mag_msg;
         mag_msg.header.stamp = Node::now();
-        mag_msg.header.frame_id = "mag_data_link";
+        mag_msg.header.frame_id = mag_frame_id;
         // Magnetic field in Tesla
         mag_msg.magnetic_field.x = (double)mag.x() * 1e-6;
         mag_msg.magnetic_field.y = (double)mag.y() * 1e-6;
@@ -406,11 +489,6 @@ void I2C_SENSORS::read_BNO055()
         mag_pub_->publish(mag_msg);
     }
 }
-
-
-
-
-
 
 
 } //namespace

@@ -35,6 +35,7 @@
 #include "i2c_sensors/util_tools.hpp"
 #include "i2c_sensors/BNO055.h"
 #include "i2c_sensors/MS5837.hpp"
+#include "i2c_sensors/KellerLD.h"
 #include "uuv_msgs/msg/barometer.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/magnetic_field.hpp"
@@ -67,8 +68,6 @@ using std::placeholders::_1;
 
 namespace navigation_module{
 
-
-
 class I2C_SENSORS: public rclcpp::Node
 {
 public:
@@ -76,6 +75,11 @@ public:
     static constexpr float LOW_BATTERY = 11.5f;
     uint8_t ready = 0;
     uint8_t error = 0;
+
+    std::string imu_frame_id;
+    std::string mag_frame_id;
+    std::string euler_frame_id;
+    std::string pressure_frame_id;
 
 
     I2C_SENSORS();
@@ -87,8 +91,9 @@ public:
     void Int2bytes(int value, uint8_t *bytes);
 
     //Class sensors
-    Adafruit_BNO055 bno;
-    MS5837 ms5837;
+    std::unique_ptr<Adafruit_BNO055> bno;
+    std::unique_ptr<MS5837> ms5837;
+    std::unique_ptr<KellerLD> kellerLD;
 
 private:
     int n_writ;
@@ -98,6 +103,9 @@ private:
     std::string i2c_address;
     bool useBNO055;
     bool useMS5837;
+    bool useKellerLD;
+    bool ms5837WaitingForData = false;
+    bool kellerWaitingForData = false;
     
     int loops = 0;
     bool writeCalibration = false;
@@ -108,15 +116,10 @@ private:
     double current_depth = 0.0;
     double depth = 0.0;
 
-
-
     uint8_t *buffer;
     util_tools::imu_t imu_data;
     util_tools::attitude_t euler_data;
     std_msgs::msg::Bool imu_calib_status_msgs;
-    
-
-    
 
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::TimerBase::SharedPtr timer_parameters_;
@@ -132,9 +135,6 @@ private:
 
     void timerCallback();
     void call_imu_calibration(const std_msgs::msg::Bool::SharedPtr status);
-    //void timerCallbackBarometer();
-    //void topic_callback(const rov_msgs::msg::Control::SharedPtr msg);
-
 
 };
 
