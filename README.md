@@ -1,8 +1,8 @@
 # i2c_sensors 
 ROS2 Plugin for the use of I2C sensors.
 ## Description
-This repository contains a plugin for the use of I2C sensors such as the BNO055 IMU (Adafruit Breakout) and the BlueRobotics Bar30 pressure sensor (MS5837-30BA from TE Connectivity).
-For use in our systems (ARM Processors), arduino libraries such as the [Adafruit_BNO055](https://github.com/adafruit/Adafruit_BNO055) and [BlueRobotics_MS5837_Library](https://github.com/bluerobotics/BlueRobotics_MS5837_Library) were adapted and new functions were added.
+This repository contains a plugin for the use of I2C sensors such as the BNO055 IMU (Adafruit Breakout), the BlueRobotics Bar30 and Bar100 pressure sensors.
+For use in our systems (ARM Processors), arduino libraries such as the [Adafruit_BNO055](https://github.com/adafruit/Adafruit_BNO055), [BlueRobotics_MS5837_Library](https://github.com/bluerobotics/BlueRobotics_MS5837_Library) and [BlueRobotics_KellerLD_Library](https://github.com/bluerobotics/BlueRobotics_KellerLD_Library/tree/master) were adapted and new functions were added.
 
 ## Requirements
 - [ROS2](https://docs.ros.org/en/galactic/Installation.html) - Galactic
@@ -118,6 +118,11 @@ ros2 param set /i2c_sensors_node write_calibration true
 - `i2c_bus_address`
 - `use_bno055`
 - `use_ms5837`
+- `use_kellerLD`
+- `frame_id`
+- `imu_frame_id`
+- `mag_frame_id`
+- `ahrs_frame_id`
 - `bno055_calib_params`
 - `read_sensor_quality`
 - `write_calibration`
