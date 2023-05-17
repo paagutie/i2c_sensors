@@ -1,9 +1,16 @@
 i2c_sensors_node:
   ros__parameters:
     i2c_bus_address: "/dev/i2c-1"
-    use_bno055: True
-    use_ms5837: False
-    bno055_calib_params: [234, 255, 221, 255, 217, 255, 
-                          154, 255, 125, 1,   159, 255, 
-                          0,   0,   254, 255, 0,   0,
-                          232, 3,   86,  3]
+    pressure_sensor:
+      frame_id: "minirov/base_link/depth"
+      use_ms5837: False
+      use_kellerLD: False
+    bno055_sensor:
+      imu_frame_id: "minirov/base_link/imu_sensor"
+      mag_frame_id: "minirov/base_link/magnetometer"
+      euler_frame_id: "minirov/base_link/euler"
+      use_bno055: True
+      bno055_calib_params: [234, 255, 221, 255, 217, 255, 
+                            154, 255, 125, 1,   159, 255, 
+                            0,   0,   254, 255, 0,   0,
+                            232, 3,   86,  3]
