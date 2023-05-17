@@ -45,8 +45,10 @@ ament_python_install_package(scripts)
 
 file(GLOB SOURCE_FILES
  src/BNO055.cpp
+ src/KellerLD.cpp
  include/${PROJECT_NAME}/BNO055.h
  include/${PROJECT_NAME}/MS5837.hpp
+ include/${PROJECT_NAME}/KellerLD.h
 )
 
 add_library(i2c_sensors_component SHARED src/lifecycle_i2c_component.cpp ${SOURCE_FILES})
