@@ -114,15 +114,5 @@ ros2 param set /i2c_sensors_node write_calibration true
 - `imu/calib/status`
 - `euler/data`
 
-## ROS2 Parameters 
-- `i2c_bus_address`
-- `use_bno055`
-- `use_ms5837`
-- `use_kellerLD`
-- `frame_id`
-- `imu_frame_id`
-- `mag_frame_id`
-- `ahrs_frame_id`
-- `bno055_calib_params`
-- `read_sensor_quality`
-- `write_calibration`
+### Available Parameters
+- See the [params.yaml](config/params.yaml) file.
