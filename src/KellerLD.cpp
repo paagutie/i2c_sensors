@@ -28,7 +28,6 @@ void KellerLD::init() {
     day = (scaling0 & 0b0000000001111100) >> 2;
 	
     // handle P-mode pressure offset (to vacuum pressure)
-
     if (mode == 0) { 
         // PA mode, Vented Gauge. Zero at atmospheric pressure
         P_mode = 1.01325;
@@ -45,6 +44,8 @@ void KellerLD::init() {
     P_min = *reinterpret_cast<float*>(&scaling12);
     uint32_t scaling34 = (uint32_t(readMemoryMap(LD_SCALING3)) << 16) | readMemoryMap(LD_SCALING4);
     P_max = *reinterpret_cast<float*>(&scaling34);
+
+    //printf("scaling12 %d scaling34 %d p_min %f p_max %f\n", scaling12, scaling34, P_min, P_max);
 }
 
 void KellerLD::setFluidDensity(float density) {
@@ -64,7 +65,7 @@ uint8_t KellerLD::read_request() {
         printf("Failed to write 1 byte to the i2c bus.\n");
         return 99;
     }
-    return 0;
+    return 1;
 }
 
 uint8_t KellerLD::read_data() {
@@ -98,12 +99,16 @@ uint16_t KellerLD::readMemoryMap(uint8_t mtp_address) {
     int n_writ = 0;
 
     buffer[0] = mtp_address;
+
     n_writ = write(file_,buffer,1);
-    if (n_writ != 1) 
-    printf("Failed to write 1 to the i2c bus.\n");
+    if (n_writ != 1)
+    {
+        status = 98;
+        printf("Failed to write 1 to the i2c bus.\n");
+        return 0;
+    }
 
-    usleep(1000); //1ms
-
+    usleep(1000);
     memset(buffer,'\0',3);
     int n_read = 0;
     n_read = read(file_,buffer,3);
@@ -153,5 +158,6 @@ float KellerLD::altitude() {
 }
 
 bool KellerLD::isInitialized() {
-    return (cust_id0 >> 10) != 63; // If not connected, equipment code == 63
+    //printf("cust_id0: %d\n", (cust_id0 >> 10));
+    return (cust_id0 >> 10 !=27) ? false : true;
 }

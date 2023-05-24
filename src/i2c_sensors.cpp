@@ -149,7 +149,7 @@ Node("i2c_sensors_node")
             rclcpp::Duration duration = time_end - time_begin;
             if(duration.seconds() >= 30.0)
             {
-                RCLCPP_ERROR(this->get_logger(), "Error when initializing the MS5837 sensor.");
+                RCLCPP_ERROR(this->get_logger(), "Error when initializing the Bar100 sensor.");
                 exit(2);
             }
 
@@ -311,7 +311,7 @@ void I2C_SENSORS::read_barometer()
             }
 
             double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time).count();
-            if(dt >= 20) //19 (22.10.21)
+            if(dt >= 20)
             {
                 loops++;
                 if(loops == 1)
@@ -363,13 +363,18 @@ void I2C_SENSORS::read_barometer()
                 if(!kellerWaitingForData)
                 {
                     if(kellerLD->read_request() != 99)
-                      kellerWaitingForData = true;
-                    else RCLCPP_ERROR(this->get_logger(), "KellerLD: Failed to write 1 byte to the i2c bus.");
+                        kellerWaitingForData = true;
+                    else
+                        RCLCPP_ERROR(this->get_logger(), "KellerLD: Failed to write 1 byte to the i2c bus.");
+
                     last_time = current_time;
                 }
 
                 double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time).count();
-                if(dt >= 9)
+
+                //The sensor needs at least 9ms to compute the internal variables
+                //dt must be in that case greater or equal to 10ms
+                if(dt >= 50) //We use a data rate of 20Hz
                 {
                     uint8_t status = kellerLD->read_data();
                     if(status != 99)
@@ -383,9 +388,10 @@ void I2C_SENSORS::read_barometer()
                         baro_msg.pressure = (double)kellerLD->pressure(KellerLD::bar);
 
                         barometer_pub_->publish(baro_msg);
-                        kellerWaitingForData = false;
+                        printf("Depth: %f, temperature %f\n", baro_msg.depth, baro_msg.temperature);
                     }
                     else RCLCPP_ERROR(this->get_logger(), "KellerLD: Failed to read 5 bytes from the i2c bus.");
+                    kellerWaitingForData = false;
                     last_time = current_time;
                 }
                 
@@ -502,5 +508,3 @@ int main(int argc, char *argv[])
     rclcpp::shutdown();
     return 0;
 }
-
-
