@@ -388,7 +388,6 @@ void I2C_SENSORS::read_barometer()
                         baro_msg.pressure = (double)kellerLD->pressure(KellerLD::bar);
 
                         barometer_pub_->publish(baro_msg);
-                        printf("Depth: %f, temperature %f\n", baro_msg.depth, baro_msg.temperature);
                     }
                     else RCLCPP_ERROR(this->get_logger(), "KellerLD: Failed to read 5 bytes from the i2c bus.");
                     kellerWaitingForData = false;
