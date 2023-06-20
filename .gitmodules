@@ -1,0 +1,3 @@
+[submodule "include/i2c_sensors/Jetson_INA219"]
+	path = include/i2c_sensors/Jetson_INA219
+	url = https://github.com/paagutie/Jetson_INA219.git
