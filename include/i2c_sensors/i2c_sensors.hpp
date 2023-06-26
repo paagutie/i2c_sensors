@@ -35,7 +35,7 @@
 #include "i2c_sensors/util_tools.hpp"
 #include "i2c_sensors/BNO055.h"
 #include "i2c_sensors/MS5837.hpp"
-#include "i2c_sensors/KellerLD.h"
+#include "i2c_sensors/BlueRobotics_KellerLD_Library/include/KellerLD.h"
 #include "i2c_sensors/Jetson_INA219/include/INA219.h"
 #include "uuv_msgs/msg/barometer.hpp"
 #include "uuv_msgs/msg/battery.hpp"
