@@ -1,3 +1,7 @@
 [submodule "include/i2c_sensors/Jetson_INA219"]
 	path = include/i2c_sensors/Jetson_INA219
 	url = https://github.com/paagutie/Jetson_INA219.git
+[submodule "include/i2c_sensors/BlueRobotics_KellerLD_Library"]
+	path = include/i2c_sensors/BlueRobotics_KellerLD_Library
+	url = https://github.com/paagutie/BlueRobotics_KellerLD_Library.git
+	branch = jetsonNano
