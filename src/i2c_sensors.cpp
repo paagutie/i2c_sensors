@@ -141,17 +141,15 @@ Node("i2c_sensors_node")
     }
     else if(useKellerLD)
     {
+        kellerLD = std::make_unique<KellerLD>(file, LD_ADDR);
         RCLCPP_INFO(get_logger(), "KellerLD pressure sensor has been selected.");
-        if (ioctl(file, I2C_SLAVE, LD_ADDR) < 0) 
+
+        if(!kellerLD->scan())
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to KellerLD.");
             exit(1);
         }
 
-        kellerLD = std::make_unique<KellerLD>();
-        kellerLD->setI2CPort(file);
-        kellerLD->init();
-        
         rclcpp::Time time_begin = this->now();
         while (!kellerLD->isInitialized()) {
             RCLCPP_INFO(this->get_logger(), "Are SDA/SCL connected correctly?");
@@ -400,7 +398,7 @@ void I2C_SENSORS::read_barometer()
         }
         else if(useKellerLD)
         {
-            if (ioctl(file, I2C_SLAVE, LD_ADDR) < 0) 
+            if (!kellerLD->scan()) 
                 RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to KellerLD.");
             else
             {
