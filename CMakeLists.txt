@@ -49,6 +49,8 @@ file(GLOB SOURCE_FILES
  include/${PROJECT_NAME}/BNO055.h
  include/${PROJECT_NAME}/MS5837.hpp
  include/${PROJECT_NAME}/KellerLD.h
+ include/${PROJECT_NAME}/Jetson_INA219/include/INA219.cpp
+ include/${PROJECT_NAME}/Jetson_INA219/include/INA219.h
 )
 
 add_library(i2c_sensors_component SHARED src/lifecycle_i2c_component.cpp ${SOURCE_FILES})

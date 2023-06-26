@@ -1,10 +1,17 @@
 i2c_sensors_node:
   ros__parameters:
     i2c_bus_address: "/dev/i2c-1"
+    wattmeter:
+      frame_id: "minirov/base_link/wattmeter0"
+      topic_name: "main/enclosure/battery/data"
+      use_ina219: True
+      shunt_resistor_value: 0.01 #Value in Ohms
+      shunt_volt_offset: -0.03   #Voltage offset in shunt resistor
+      battery_capacity: 37.2     #Capacity in Ah
     pressure_sensor:
       frame_id: "minirov/base_link/depth"
       use_ms5837: False
-      use_kellerLD: False
+      use_kellerLD: True
     bno055_sensor:
       imu_frame_id: "minirov/base_link/imu_sensor"
       mag_frame_id: "minirov/base_link/magnetometer"

@@ -36,7 +36,9 @@
 #include "i2c_sensors/BNO055.h"
 #include "i2c_sensors/MS5837.hpp"
 #include "i2c_sensors/KellerLD.h"
+#include "i2c_sensors/Jetson_INA219/include/INA219.h"
 #include "uuv_msgs/msg/barometer.hpp"
+#include "uuv_msgs/msg/battery.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/magnetic_field.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -72,7 +74,7 @@ class I2C_SENSORS: public rclcpp::Node
 {
 public:
     static constexpr float Pa = 100.0f;
-    static constexpr float LOW_BATTERY = 11.5f;
+    static constexpr float LOW_BATTERY = 12.5f;
     uint8_t ready = 0;
     uint8_t error = 0;
 
@@ -80,6 +82,8 @@ public:
     std::string mag_frame_id;
     std::string euler_frame_id;
     std::string pressure_frame_id;
+    std::string wattmeter_frame_id;
+    std::string wattmeter_topic_name;
 
 
     I2C_SENSORS();
@@ -87,6 +91,7 @@ public:
 
     void read_barometer();
     void read_BNO055();
+    void read_ina219();
     void close_i2c();
     void Int2bytes(int value, uint8_t *bytes);
 
@@ -94,6 +99,7 @@ public:
     std::unique_ptr<Adafruit_BNO055> bno;
     std::unique_ptr<MS5837> ms5837;
     std::unique_ptr<KellerLD> kellerLD;
+    std::unique_ptr<INA219_IIC> ina219;
 
 private:
     int n_writ;
@@ -104,6 +110,7 @@ private:
     bool useBNO055;
     bool useMS5837;
     bool useKellerLD;
+    bool useINA219;
     bool ms5837WaitingForData = false;
     bool kellerWaitingForData = false;
     
@@ -115,6 +122,9 @@ private:
     double depth_adjustment_ = 0.0;
     double current_depth = 0.0;
     double depth = 0.0;
+    double shunt_resistor_value = 0.0;
+    double shunt_volt_offset = 0.0;
+    double battery_capacity = 0.0;
 
     uint8_t *buffer;
     util_tools::imu_t imu_data;
@@ -127,11 +137,13 @@ private:
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr imu_calib_sub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr imu_calib_pub_;
     rclcpp::Publisher<uuv_msgs::msg::Barometer>::SharedPtr barometer_pub_;
+    rclcpp::Publisher<uuv_msgs::msg::Battery>::SharedPtr battery_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr euler_pub_;
     rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr mag_pub_;  
     
     std::chrono::high_resolution_clock::time_point last_time;
+    std::chrono::high_resolution_clock::time_point last_time_ina219;
 
     void timerCallback();
     void call_imu_calibration(const std_msgs::msg::Bool::SharedPtr status);
