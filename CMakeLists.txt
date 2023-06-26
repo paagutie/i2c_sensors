@@ -45,10 +45,10 @@ ament_python_install_package(scripts)
 
 file(GLOB SOURCE_FILES
  src/BNO055.cpp
- src/KellerLD.cpp
  include/${PROJECT_NAME}/BNO055.h
  include/${PROJECT_NAME}/MS5837.hpp
- include/${PROJECT_NAME}/KellerLD.h
+ include/${PROJECT_NAME}/BlueRobotics_KellerLD_Library/include/KellerLD.cpp
+ include/${PROJECT_NAME}/BlueRobotics_KellerLD_Library/include/KellerLD.h
  include/${PROJECT_NAME}/Jetson_INA219/include/INA219.cpp
  include/${PROJECT_NAME}/Jetson_INA219/include/INA219.h
 )
