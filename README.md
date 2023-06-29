@@ -113,6 +113,7 @@ ros2 param set /i2c_sensors_node write_calibration true
 - `imu/calib/cmd`
 - `imu/calib/status`
 - `euler/data`
+- `main/enclosure/battery/data`
 
 ### Available Parameters
 - See the [params.yaml](config/params.yaml) file.
