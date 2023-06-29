@@ -235,7 +235,7 @@ Node("i2c_sensors_node")
         ina219->setShuntVoltOffset_mV(shunt_volt_offset);
         ina219->setCalibration_32V_2A();
 
-        battery_pub_ = this->create_publisher<uuv_msgs::msg::Battery>("main/enclosure/battery/data", qos);
+        battery_pub_ = this->create_publisher<uuv_msgs::msg::Battery>(wattmeter_topic_name, qos);
     }
 
     //ROS2 timers
