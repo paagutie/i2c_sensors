@@ -113,6 +113,11 @@ private:
     bool useINA219;
     bool ms5837WaitingForData = false;
     bool kellerWaitingForData = false;
+
+    // Rates
+    int ina219_rate = 10;
+    int bno055_rate = 100;
+    int kellerLD_rate = 20;
     
     int loops = 0;
     bool writeCalibration = false;

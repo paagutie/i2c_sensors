@@ -24,6 +24,7 @@ Node("i2c_sensors_node")
     RCLCPP_INFO(get_logger(), "I2C_BUS_ADDRESS: '%s'", i2c_address.c_str());
 
     this->declare_parameter<bool>("wattmeter.use_ina219", false);
+    this->declare_parameter<int>("wattmeter.rate", 10);
     this->declare_parameter<double>("wattmeter.shunt_resistor_value", 0.01);
     this->declare_parameter<double>("wattmeter.shunt_volt_offset", -0.03);
     this->declare_parameter<double>("wattmeter.battery_capacity", 37.2);
@@ -31,13 +32,16 @@ Node("i2c_sensors_node")
     this->declare_parameter<std::string>("wattmeter.topic_name", "battery/data");
     this->declare_parameter<bool>("pressure_sensor.use_ms5837", false);
     this->declare_parameter<bool>("pressure_sensor.use_kellerLD", true);
+    this->declare_parameter<int>("pressure_sensor.kellerLD_rate", 20);
     this->declare_parameter<std::string>("pressure_sensor.frame_id", "base_link/depth");
     this->declare_parameter<bool>("bno055_sensor.use_bno055", true);
+    this->declare_parameter<int>("bno055_sensor.rate", 100);
     this->declare_parameter<std::string>("bno055_sensor.imu_frame_id", "base_link/imu_sensor");
     this->declare_parameter<std::string>("bno055_sensor.mag_frame_id", "base_link/magnetometer");
     this->declare_parameter<std::string>("bno055_sensor.euler_frame_id", "base_link/euler");
 
     useINA219 = this->get_parameter("wattmeter.use_ina219").as_bool();
+    ina219_rate = this->get_parameter("wattmeter.rate").as_int();
     shunt_resistor_value = this->get_parameter("wattmeter.shunt_resistor_value").as_double();
     shunt_volt_offset = this->get_parameter("wattmeter.shunt_volt_offset").as_double();
     wattmeter_frame_id = this->get_parameter("wattmeter.frame_id").as_string();
@@ -45,8 +49,10 @@ Node("i2c_sensors_node")
     battery_capacity = this->get_parameter("wattmeter.battery_capacity").as_double();
     useMS5837 = this->get_parameter("pressure_sensor.use_ms5837").as_bool();
     useKellerLD = this->get_parameter("pressure_sensor.use_kellerLD").as_bool();
+    kellerLD_rate = this->get_parameter("pressure_sensor.kellerLD_rate").as_int();
     pressure_frame_id = this->get_parameter("pressure_sensor.frame_id").as_string();
     useBNO055 = this->get_parameter("bno055_sensor.use_bno055").as_bool();
+    bno055_rate = this->get_parameter("bno055_sensor.rate").as_int();
     imu_frame_id = this->get_parameter("bno055_sensor.imu_frame_id").as_string();
     mag_frame_id = this->get_parameter("bno055_sensor.mag_frame_id").as_string();
     euler_frame_id = this->get_parameter("bno055_sensor.euler_frame_id").as_string();
@@ -106,6 +112,11 @@ Node("i2c_sensors_node")
             qos_profile.depth
             ),
         qos_profile);
+    
+    auto qos_best_effort = rclcpp::QoS(1);
+    qos_best_effort.best_effort();
+    qos_best_effort.keep_last(1);
+    qos_best_effort.durability_volatile();
 
     if(useMS5837)
     {
@@ -207,8 +218,8 @@ Node("i2c_sensors_node")
         euler_pub_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>("euler/data", qos);
         imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", qos);
         mag_pub_ = this->create_publisher<sensor_msgs::msg::MagneticField>("mag/data", qos);
-        imu_calib_sub_ = this->create_subscription<std_msgs::msg::Bool>("imu/calib/cmd", 5, std::bind(&I2C_SENSORS::call_imu_calibration, this, _1));
-        imu_calib_pub_ = this->create_publisher<std_msgs::msg::Bool>("imu/calib/status", 5);
+        imu_calib_sub_ = this->create_subscription<std_msgs::msg::Bool>("imu/calib/cmd", qos_best_effort, std::bind(&I2C_SENSORS::call_imu_calibration, this, _1));
+        imu_calib_pub_ = this->create_publisher<std_msgs::msg::Bool>("imu/calib/status", qos_best_effort);
     }
 
     if(useINA219)
@@ -239,7 +250,8 @@ Node("i2c_sensors_node")
     }
 
     //ROS2 timers
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(10),std::bind(&I2C_SENSORS::timerCallback, this)); //2hz
+    int rate_ms = 1000/bno055_rate;
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(rate_ms),std::bind(&I2C_SENSORS::timerCallback, this));
 
     last_time_ina219 = last_time = std::chrono::high_resolution_clock::now();
     RCLCPP_INFO(this->get_logger(), "I2C_SENSORS - Success!");
@@ -416,7 +428,8 @@ void I2C_SENSORS::read_barometer()
 
                 //The sensor needs at least 9ms to compute the internal variables
                 //dt must be in that case greater or equal to 10ms
-                if(dt >= 50) //We use a data rate of 20Hz
+                int rate_ms = 1000/kellerLD_rate;
+                if(dt >= rate_ms)
                 {
                     uint8_t status = kellerLD->read_data();
                     if(status != 99)
@@ -543,7 +556,8 @@ void I2C_SENSORS::read_ina219()
     std::chrono::high_resolution_clock::time_point current_time = std::chrono::high_resolution_clock::now();
     double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time_ina219).count();
 
-    if(dt >= 100) //10Hz
+    int rate_ms = 1000/ina219_rate;
+    if(dt >= rate_ms)
     {
         if(!ina219->scan())
             RCLCPP_ERROR(this->get_logger(), "Failed to acquire bus access and/or talk to INA219!");
