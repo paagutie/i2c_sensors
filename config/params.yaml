@@ -4,15 +4,18 @@ i2c_sensors_node:
     wattmeter:
       frame_id: "minirov/base_link/wattmeter0"
       topic_name: "main/enclosure/battery/data"
+      rate: 10 #Hz
       use_ina219: True
       shunt_resistor_value: 0.01 #Value in Ohms
       shunt_volt_offset: -0.03   #Voltage offset in shunt resistor
       battery_capacity: 37.2     #Capacity in Ah
     pressure_sensor:
       frame_id: "minirov/base_link/depth"
+      kellerLD_rate: 20 #Hz
       use_ms5837: False
       use_kellerLD: True
     bno055_sensor:
+      rate: 100 #Hz
       imu_frame_id: "minirov/base_link/imu_sensor"
       mag_frame_id: "minirov/base_link/magnetometer"
       euler_frame_id: "minirov/base_link/euler"
